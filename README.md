@@ -150,6 +150,7 @@ npm run dev
 - **Features**:
   - Kanban board with drag-and-drop functionality
   - Issue columns: Backlog, Todo, In Progress, Done
+  - Project switcher: Quickly switch between all projects you have access to across all teams
   - Create new issues with:
     - Title and description
     - Priority (Low/Medium/High)
@@ -164,11 +165,17 @@ npm run dev
     - Create custom labels with colors
     - Assign multiple labels per issue
   - Real-time issue filtering and sorting
+  - **AI-Powered Features** (in issue detail modal):
+    - **AI Advice**: Get AI-generated todo lists and time estimates for completing the task
+    - **AI Label Recommendations**: Automatically suggest relevant labels based on issue content
+    - **Comment Summarization**: Summarize long comment threads (requires 5+ comments)
+    - Smart caching to minimize API calls and respect rate limits
 - **Access**: Team members only (via project's team)
 - **Permissions**:
   - View issues: All team members
   - Create/Edit/Delete issues: All team members
   - Manage labels: All team members
+  - Use AI features: All team members (subject to rate limits)
 
 ### Dashboard Layout
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { KanbanCard } from "@/components/ui/kanban-card";
-import { Filter, Search, X, Edit2, Trash2, Send, Sparkles } from "lucide-react";
+import { Filter, Search, X, Edit2, Trash2, Send, Sparkles, MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   DndContext,
@@ -27,6 +27,9 @@ import {
   setCachedAiAdvice,
   getCachedLabelRecommendations,
   setCachedLabelRecommendations,
+  getCachedCommentSummary,
+  setCachedCommentSummary,
+  invalidateCommentSummaryCache,
   invalidateAllAiCaches,
   validateDescriptionForAI,
 } from "@/lib/api/aiCache";
@@ -221,6 +224,8 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
   const [isLoadingAiAdvice, setIsLoadingAiAdvice] = useState(false);
   const [recommendedLabels, setRecommendedLabels] = useState<any[]>([]);
   const [isLoadingLabelRecommendations, setIsLoadingLabelRecommendations] = useState(false);
+  const [commentSummary, setCommentSummary] = useState<string>("");
+  const [isLoadingCommentSummary, setIsLoadingCommentSummary] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -733,9 +738,21 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       setEditedTitle(issue.title);
       setEditedDescription(issue.description || "");
       setIsIssueDetailOpen(true);
-      // Reset AI data when opening new issue
-      setAiAdvice("");
+
+      // Load cached AI data when opening issue
+      const cachedAdvice = getCachedAiAdvice(
+        issue.id,
+        issue.updated_at || issue.created_at
+      );
+      if (cachedAdvice) {
+        setAiAdvice(cachedAdvice);
+      } else {
+        setAiAdvice("");
+      }
+
+      // Reset label recommendations (they need project context)
       setRecommendedLabels([]);
+
       // Load comments for this issue
       loadComments(issue.id);
     }
@@ -857,6 +874,11 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
 
     if (!error) {
       setNewComment("");
+
+      // Invalidate comment summary cache when new comment is added
+      invalidateCommentSummaryCache(selectedIssue.id);
+      setCommentSummary("");
+
       // Reload comments
       await loadComments(selectedIssue.id);
 
@@ -866,6 +888,75 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       }
     } else {
       console.error("Error posting comment:", error);
+    }
+  };
+
+  const handleSummarizeComments = async () => {
+    if (!selectedIssue || !currentUser) return;
+    if (comments.length < 5) return;
+
+    setIsLoadingCommentSummary(true);
+    setCommentSummary("");
+
+    try {
+      // Get last comment timestamp for cache validation
+      const lastCommentTime = comments.length > 0
+        ? comments[comments.length - 1].created_at
+        : new Date().toISOString();
+
+      // Check cache first
+      const cached = getCachedCommentSummary(
+        selectedIssue.id,
+        lastCommentTime
+      );
+
+      if (cached) {
+        setCommentSummary(cached);
+        setIsLoadingCommentSummary(false);
+        return;
+      }
+
+      // Prepare comments context
+      const commentsContext = comments
+        .map((c: any, idx: number) =>
+          `Comment ${idx + 1} (by ${c.user?.name || 'Unknown'}, ${new Date(c.created_at).toLocaleDateString()}):\n${c.content}`
+        )
+        .join('\n\n');
+
+      const prompt = `Based on the following comments from an issue discussion, please provide:
+
+1. A brief summary of the discussion (3-5 sentences)
+2. Key decisions made (if any)
+
+Comments:
+${commentsContext}
+
+IMPORTANT: Provide your response in PLAIN TEXT ONLY. Do NOT use any markdown formatting. Use simple numbering and line breaks.`;
+
+      const response = await askGPT(
+        prompt,
+        "You are a helpful assistant that summarizes technical discussions. Be concise and focus on actionable outcomes.",
+        undefined,
+        currentUser.id
+      );
+
+      // Cache the result
+      setCachedCommentSummary(
+        selectedIssue.id,
+        response,
+        lastCommentTime
+      );
+
+      setCommentSummary(response);
+    } catch (error: any) {
+      console.error("Error summarizing comments:", error);
+      if (error.message && error.message.includes('Rate limit')) {
+        setCommentSummary(`⚠️ ${error.message}`);
+      } else {
+        setCommentSummary(`⚠️ Failed to summarize comments: ${error.message || 'Unknown error'}`);
+      }
+    } finally {
+      setIsLoadingCommentSummary(false);
     }
   };
 
@@ -949,7 +1040,7 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       );
 
       if (cached) {
-        setAiAdvice(`[Cached Result]\n\n${cached}`);
+        setAiAdvice(cached);
         setIsLoadingAiAdvice(false);
         return;
       }
@@ -1892,6 +1983,21 @@ IMPORTANT:
                     Comments ({comments.length})
                   </label>
 
+                  {/* Comment Summary Display */}
+                  {commentSummary && (
+                    <div className="mb-4 p-4 border border-blue-200 rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <MessageSquare className="w-5 h-5 text-blue-600" />
+                        <span className="text-sm font-semibold text-blue-900">
+                          Discussion Summary
+                        </span>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
+                        {commentSummary}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Comment Input */}
                   <div className="mb-4">
                     <div className="flex gap-3">
@@ -1914,8 +2020,8 @@ IMPORTANT:
                           rows={3}
                         />
                         <div className="flex justify-end mt-2">
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={handlePostComment}
                             disabled={!newComment.trim()}
                           >
@@ -1928,9 +2034,9 @@ IMPORTANT:
                   </div>
 
                   {/* Comments List */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 mb-4">
                     {comments.length > 0 ? (
-                      comments.map((comment: any) => (
+                      [...comments].reverse().map((comment: any) => (
                         <div key={comment.id} className="flex gap-3">
                           <img
                             src={getAvatarUrl(comment.user.name, comment.user.profile_image)}
@@ -1960,6 +2066,32 @@ IMPORTANT:
                       <div className="text-sm text-gray-500 text-center py-4">
                         No comments yet. Be the first to comment!
                       </div>
+                    )}
+                  </div>
+
+                  {/* Summarize Button - Full Width at Bottom */}
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleSummarizeComments}
+                      disabled={comments.length < 5 || isLoadingCommentSummary}
+                    >
+                      {isLoadingCommentSummary ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Summarizing...
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Summarize Comments
+                        </>
+                      )}
+                    </Button>
+                    {comments.length < 5 && (
+                      <p className="text-xs text-gray-500 text-center">
+                        At least 5 comments are required to use the summarization feature
+                      </p>
                     )}
                   </div>
                 </div>

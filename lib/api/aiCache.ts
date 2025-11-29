@@ -10,6 +10,7 @@ export interface CachedAIResult {
 // In-memory cache storage (will persist during server runtime)
 const aiAdviceCache = new Map<string, CachedAIResult>();
 const aiLabelsCache = new Map<string, CachedAIResult>();
+const aiCommentSummaryCache = new Map<string, CachedAIResult>();
 
 /**
  * Clean expired cache entries
@@ -156,12 +157,79 @@ export function invalidateLabelRecommendationsCache(issueId: string): void {
 }
 
 /**
+ * Get cached comment summary for an issue
+ * @param issueId - Issue ID
+ * @param lastCommentTime - Last comment timestamp
+ * @returns Cached result or null
+ */
+export function getCachedCommentSummary(
+  issueId: string,
+  lastCommentTime?: string
+): string | null {
+  cleanExpiredEntries(aiCommentSummaryCache);
+
+  const cached = aiCommentSummaryCache.get(issueId);
+  if (!cached) return null;
+
+  // Check if cache expired
+  if (new Date(cached.expiresAt).getTime() < Date.now()) {
+    aiCommentSummaryCache.delete(issueId);
+    return null;
+  }
+
+  // Check if new comment was added after cache was created
+  if (lastCommentTime && cached.descriptionUpdatedAt) {
+    const cacheTime = new Date(cached.descriptionUpdatedAt).getTime();
+    const commentTime = new Date(lastCommentTime).getTime();
+
+    if (commentTime > cacheTime) {
+      // New comment added, invalidate cache
+      aiCommentSummaryCache.delete(issueId);
+      return null;
+    }
+  }
+
+  return cached.result;
+}
+
+/**
+ * Set cached comment summary for an issue
+ * @param issueId - Issue ID
+ * @param result - AI result to cache
+ * @param lastCommentTime - Latest comment timestamp
+ */
+export function setCachedCommentSummary(
+  issueId: string,
+  result: string,
+  lastCommentTime?: string
+): void {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + CACHE_TTL_MS);
+
+  aiCommentSummaryCache.set(issueId, {
+    result,
+    cachedAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    descriptionUpdatedAt: lastCommentTime,
+  });
+}
+
+/**
+ * Invalidate comment summary cache for an issue
+ * @param issueId - Issue ID
+ */
+export function invalidateCommentSummaryCache(issueId: string): void {
+  aiCommentSummaryCache.delete(issueId);
+}
+
+/**
  * Invalidate all AI caches for an issue (when description is updated)
  * @param issueId - Issue ID
  */
 export function invalidateAllAiCaches(issueId: string): void {
   invalidateAiAdviceCache(issueId);
   invalidateLabelRecommendationsCache(issueId);
+  invalidateCommentSummaryCache(issueId);
 }
 
 /**
