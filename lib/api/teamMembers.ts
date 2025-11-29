@@ -53,7 +53,38 @@ export async function getUserRole(teamId: string, userId: string): Promise<'OWNE
   }
 }
 
-// Invite a member to the team (create team invite)
+// Add multiple members to the team directly
+export async function addMembersToTeam(
+  teamId: string,
+  userIds: string[],
+  addedBy: string,
+  role: 'OWNER' | 'ADMIN' | 'MEMBER' = 'MEMBER'
+): Promise<void> {
+  try {
+    // Add all members
+    const { error } = await supabase
+      .from('team_members')
+      .insert(
+        userIds.map(userId => ({
+          team_id: teamId,
+          user_id: userId,
+          role,
+        }))
+      );
+
+    if (error) throw error;
+
+    // Log the activity for each member
+    for (const userId of userIds) {
+      await logTeamActivity(teamId, addedBy, 'MEMBER_ADDED', 'user', userId);
+    }
+  } catch (error) {
+    console.error('Error adding members to team:', error);
+    throw error;
+  }
+}
+
+// Invite a member to the team (create team invite) - Legacy email-based
 export async function inviteMember(
   teamId: string,
   email: string,

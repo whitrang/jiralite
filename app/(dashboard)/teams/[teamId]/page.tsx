@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Loader2Icon,
   FolderIcon,
@@ -15,14 +15,15 @@ import {
   SettingsIcon,
   UsersIcon,
   UserPlusIcon,
-  MailIcon,
   UserMinusIcon,
   StarIcon,
-  ClockIcon
+  ClockIcon,
+  CheckCircle2Icon
 } from "lucide-react"
 import { getTeamById } from "@/lib/api/teams"
-import { getTeamMembers, getUserRole, inviteMember, updateMemberRole, removeMember, TeamMemberWithUser } from "@/lib/api/teamMembers"
+import { getTeamMembers, getUserRole, addMembersToTeam, updateMemberRole, removeMember } from "@/lib/api/teamMembers"
 import { getCurrentUserId } from "@/lib/api/auth"
+import { getAllUsers } from "@/lib/api/users"
 import { supabase } from "@/lib/supabaseClient"
 
 type TeamRole = "OWNER" | "ADMIN" | "MEMBER"
@@ -69,10 +70,16 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Success message
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [isSuccessVisible, setIsSuccessVisible] = useState(false)
+
   // Invite modal
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState("")
+  const [allUsers, setAllUsers] = useState<Array<{ id: string; name: string; email: string }>>([])
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [isInviting, setIsInviting] = useState(false)
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
 
   // Remove member modal
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false)
@@ -175,21 +182,64 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const isOwner = currentUserRole === "OWNER"
   const isAdmin = currentUserRole === "ADMIN" || isOwner
 
-  const handleInviteMember = async () => {
-    if (!currentUserId) return
+  const loadAllUsers = async () => {
+    try {
+      setIsLoadingUsers(true)
+      const users = await getAllUsers()
+      setAllUsers(users.map(u => ({ id: u.id, name: u.name, email: u.email })))
+    } catch (err) {
+      console.error("Error loading users:", err)
+      alert("Failed to load users. Please try again.")
+    } finally {
+      setIsLoadingUsers(false)
+    }
+  }
+
+  const handleOpenInviteModal = () => {
+    setIsInviteModalOpen(true)
+    loadAllUsers()
+  }
+
+  const handleInviteMembers = async () => {
+    if (!currentUserId || selectedUserIds.length === 0) return
 
     try {
       setIsInviting(true)
-      await inviteMember(teamId, inviteEmail.trim(), currentUserId)
+      const count = selectedUserIds.length
+      await addMembersToTeam(teamId, selectedUserIds, currentUserId)
       setIsInviteModalOpen(false)
-      setInviteEmail("")
-      alert("Invitation sent successfully!")
+      setSelectedUserIds([])
+
+      // Reload team data to show new members
+      await loadTeamData()
+
+      // Show success message
+      setSuccessMessage(`Successfully added ${count} member${count !== 1 ? 's' : ''}!`)
+      setIsSuccessVisible(true)
+      setTimeout(() => {
+        setIsSuccessVisible(false)
+        setTimeout(() => setSuccessMessage(null), 300) // Wait for fade-out animation
+      }, 5000)
     } catch (err) {
-      console.error("Error inviting member:", err)
-      alert("Failed to send invitation. Please try again.")
+      console.error("Error adding members:", err)
+      alert("Failed to add members. Please try again.")
     } finally {
       setIsInviting(false)
     }
+  }
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId)
+      } else {
+        return [...prev, userId]
+      }
+    })
+  }
+
+  const isUserAlreadyMember = (userId: string) => {
+    return members.some(m => m.userId === userId)
   }
 
   const handleChangeRole = async (memberId: string, userId: string, newRole: TeamRole) => {
@@ -259,6 +309,17 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      {/* Success Alert */}
+      {successMessage && (
+        <Alert
+          variant="success"
+          className={`mb-6 transition-opacity duration-300 ${isSuccessVisible ? 'opacity-100' : 'opacity-0'}`}
+        >
+          <CheckCircle2Icon />
+          <AlertDescription>{successMessage}</AlertDescription>
+        </Alert>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -292,7 +353,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setIsInviteModalOpen(true)}
+                    onClick={handleOpenInviteModal}
                   >
                     <UserPlusIcon />
                   </Button>
@@ -358,15 +419,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   </div>
                 ))}
               </div>
-              {isAdmin && (
-                <Button
-                  className="w-full mt-4"
-                  variant="outline"
-                  onClick={() => router.push(`/teams/${teamId}/settings/members`)}
-                >
-                  Manage Members
-                </Button>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -458,49 +510,91 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
       {/* Invite Member Modal */}
       <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Invite Team Member</DialogTitle>
+            <DialogTitle>Add Team Members</DialogTitle>
             <DialogDescription>
-              Send an invitation to join your team via email
+              Select users to add to your team
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label htmlFor="invite-email" className="text-sm font-medium">
-                Email Address
-              </label>
-              <div className="relative">
-                <MailIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground size-4" />
-                <Input
-                  id="invite-email"
-                  type="email"
-                  placeholder="member@example.com"
-                  className="pl-10"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  disabled={isInviting}
-                />
+          <div className="py-4">
+            {isLoadingUsers ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
               </div>
-            </div>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {allUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    No users available
+                  </p>
+                ) : (
+                  allUsers.map((user) => {
+                    const isAlreadyMember = isUserAlreadyMember(user.id)
+                    const isSelected = selectedUserIds.includes(user.id)
+
+                    return (
+                      <div
+                        key={user.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                          isAlreadyMember
+                            ? 'bg-muted opacity-60 cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-primary/10 border-primary'
+                            : 'hover:bg-accent cursor-pointer'
+                        }`}
+                        onClick={() => !isAlreadyMember && toggleUserSelection(user.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={isAlreadyMember}
+                          onChange={() => toggleUserSelection(user.id)}
+                          className="size-4 rounded cursor-pointer disabled:cursor-not-allowed"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">
+                            {user.name}
+                            {isAlreadyMember && (
+                              <span className="ml-2 text-xs text-muted-foreground">(Already a member)</span>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {user.email}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+            {selectedUserIds.length > 0 && (
+              <div className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20">
+                <p className="text-sm font-medium">
+                  {selectedUserIds.length} user{selectedUserIds.length > 1 ? 's' : ''} selected
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setIsInviteModalOpen(false)
-                setInviteEmail("")
+                setSelectedUserIds([])
               }}
               disabled={isInviting}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleInviteMember}
-              disabled={!inviteEmail.trim() || !inviteEmail.includes("@") || isInviting}
+              onClick={handleInviteMembers}
+              disabled={selectedUserIds.length === 0 || isInviting}
             >
               {isInviting && <Loader2Icon className="animate-spin" />}
-              Send Invitation
+              Add {selectedUserIds.length > 0 ? `${selectedUserIds.length} ` : ''}Member{selectedUserIds.length !== 1 ? 's' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>

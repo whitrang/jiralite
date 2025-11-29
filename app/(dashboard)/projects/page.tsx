@@ -27,6 +27,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type TaskStatus = "Backlog" | "To Do" | "In Progress" | "Done";
 type BadgeVariant = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
@@ -918,17 +925,21 @@ export default function ProjectsPage() {
           <div className="flex items-center justify-between">
             {/* Project Selector */}
             {currentProject && (
-              <select
+              <Select
                 value={currentProject.id}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                onValueChange={handleProjectChange}
               >
-                {allProjects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allProjects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
             {/* Filter and Sort Buttons */}
@@ -955,16 +966,20 @@ export default function ProjectsPage() {
                 )}
               </button>
 
-              <select
+              <Select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onValueChange={(value) => setSortBy(value as SortOption)}
               >
-                <option value="created_at">생성일순</option>
-                <option value="due_date">마감일순</option>
-                <option value="priority">우선순위순</option>
-                <option value="updated_at">최근 수정순</option>
-              </select>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="정렬" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at">생성일순</SelectItem>
+                  <SelectItem value="due_date">마감일순</SelectItem>
+                  <SelectItem value="priority">우선순위순</SelectItem>
+                  <SelectItem value="updated_at">최근 수정순</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -1306,16 +1321,20 @@ export default function ProjectsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Status
                     </label>
-                    <select
+                    <Select
                       value={selectedIssue.status}
-                      onChange={(e) => handleUpdateIssueField("status", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onValueChange={(value) => handleUpdateIssueField("status", value)}
                     >
-                      <option value="Backlog">Backlog</option>
-                      <option value="To Do">To Do</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Done">Done</option>
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Backlog">Backlog</SelectItem>
+                        <SelectItem value="To Do">To Do</SelectItem>
+                        <SelectItem value="In Progress">In Progress</SelectItem>
+                        <SelectItem value="Done">Done</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Priority */}
@@ -1323,15 +1342,19 @@ export default function ProjectsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Priority
                     </label>
-                    <select
+                    <Select
                       value={selectedIssue.priority}
-                      onChange={(e) => handleUpdateIssueField("priority", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onValueChange={(value) => handleUpdateIssueField("priority", value)}
                     >
-                      <option value="HIGH">High</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="LOW">Low</option>
-                    </select>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="HIGH">High</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="LOW">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Assignee */}
@@ -1358,18 +1381,21 @@ export default function ProjectsPage() {
                         </button>
                       </div>
                     ) : (
-                      <select
+                      <Select
                         value=""
-                        onChange={(e) => handleUpdateIssueField("assignee_user_id", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onValueChange={(value) => handleUpdateIssueField("assignee_user_id", value)}
                       >
-                        <option value="">Select assignee...</option>
-                        {teamMembers.map((member: any) => (
-                          <option key={member.id} value={member.id}>
-                            {member.name}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select assignee..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {teamMembers.map((member: any) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
                   </div>
                 </div>
@@ -1409,23 +1435,25 @@ export default function ProjectsPage() {
                       );
 
                       return availableLabels.length > 0 ? (
-                        <select
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleAddLabel(e.target.value);
-                              e.target.value = "";
+                        <Select
+                          value=""
+                          onValueChange={(value) => {
+                            if (value) {
+                              handleAddLabel(value);
                             }
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          defaultValue=""
                         >
-                          <option value="">Add label...</option>
-                          {availableLabels.map((label: any) => (
-                            <option key={label.id} value={label.id}>
-                              {label.name}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Add label..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableLabels.map((label: any) => (
+                              <SelectItem key={label.id} value={label.id}>
+                                {label.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <span className="text-sm text-gray-500 italic">All labels assigned</span>
                       );
