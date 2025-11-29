@@ -32,8 +32,13 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 }
 
-// Get current user ID
+// Get current user ID from auth session
 export async function getCurrentUserId(): Promise<string | null> {
-  const user = await getCurrentUser();
-  return user?.id || null;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  } catch (error) {
+    console.error('Error getting current user ID:', error);
+    return null;
+  }
 }

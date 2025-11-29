@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function HomePage() {
   const router = useRouter();
@@ -13,6 +14,27 @@ export default function HomePage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
+
+  async function checkAuthStatus() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login");
+      }
+    } catch (error) {
+      console.error("Error checking auth status:", error);
+      router.push("/login");
+    } finally {
+      setCheckingAuth(false);
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +76,32 @@ export default function HomePage() {
     setFormData({ email, password });
     setError("");
   };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setError("");
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      setError(err.message || "Failed to sign in with Google");
+      setLoading(false);
+    }
+  };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Spinner size="lg" variant="primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">

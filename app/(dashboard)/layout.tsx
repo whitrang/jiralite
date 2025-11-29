@@ -31,25 +31,85 @@ export default function DashboardLayout({
 
   async function loadUserInfo() {
     try {
+      console.log("🔍 [loadUserInfo] Starting...");
       const userId = await getCurrentUserId();
+      console.log("🔍 [loadUserInfo] userId:", userId);
+
       if (!userId) {
+        console.log("❌ [loadUserInfo] No userId, redirecting to login");
         router.push("/login");
         return;
       }
 
+      // Check if user exists in public.users
+      console.log("🔍 [loadUserInfo] Checking if user exists in public.users...");
       const { data: userData, error } = await supabase
         .from("users")
         .select("email, name, profile_image")
         .eq("id", userId)
         .single();
 
-      if (userData) {
+      console.log("🔍 [loadUserInfo] Query result - userData:", userData, "error:", error);
+
+      // If user doesn't exist in public.users, create it (for OAuth users)
+      if (error && error.code === 'PGRST116') {
+        console.log("⚠️ [loadUserInfo] User not found in public.users (PGRST116), creating user...");
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log("🔍 [loadUserInfo] Auth user:", user);
+
+        if (user) {
+          const name = user.user_metadata?.name ||
+                       user.user_metadata?.full_name ||
+                       user.email?.split('@')[0] ||
+                       'User';
+
+          const provider = user.app_metadata?.provider || 'email';
+
+          console.log("🔍 [loadUserInfo] Attempting to insert user with:", {
+            id: user.id,
+            email: user.email,
+            name,
+            auth_provider: provider
+          });
+
+          const { data: insertData, error: insertError } = await supabase.from('users').insert({
+            id: user.id,
+            email: user.email!,
+            name: name,
+            auth_provider: provider,
+            profile_image: user.user_metadata?.avatar_url || null,
+          }).select();
+
+          if (insertError) {
+            console.error("❌ [loadUserInfo] Error creating user:", insertError);
+          } else {
+            console.log("✅ [loadUserInfo] User created successfully:", insertData);
+          }
+
+          // Set user info from auth metadata
+          setUserEmail(user.email || "");
+          setUserName(name);
+          setUserProfileImage(user.user_metadata?.avatar_url || null);
+          console.log("✅ [loadUserInfo] User state set from auth metadata");
+        } else {
+          // No user in auth, redirect to login
+          console.log("❌ [loadUserInfo] No auth user found, redirecting to login");
+          router.push("/login");
+        }
+      } else if (error) {
+        // Some other error occurred
+        console.error("❌ [loadUserInfo] Error fetching user data:", error);
+        router.push("/login");
+      } else if (userData) {
+        // User exists, set the data
+        console.log("✅ [loadUserInfo] User found in public.users, setting state");
         setUserEmail(userData.email || "");
         setUserName(userData.name || "");
         setUserProfileImage(userData.profile_image || null);
       }
     } catch (error) {
-      console.error("Error loading user info:", error);
+      console.error("❌ [loadUserInfo] Caught error:", error);
+      router.push("/login");
     }
   }
 
