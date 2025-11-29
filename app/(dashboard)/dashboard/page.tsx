@@ -17,10 +17,11 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
-import tasksData from "@/data/tasks.json";
+import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
+import type { IssueWithRelations } from "@/lib/database.types";
 
-type TaskStatus = "todo" | "inProgress" | "completed";
-
+type TaskStatus = "Backlog" | "To Do" | "In Progress" | "Done";
 type BadgeVariant = "default" | "primary" | "secondary" | "success" | "warning" | "danger";
 
 interface Task {
@@ -37,15 +38,6 @@ interface Task {
   createdAt: Date;
   dueDate?: Date;
 }
-
-// Load tasks from JSON and convert date fields
-const INITIAL_TASKS: Task[] = tasksData.tasks.map((task: any) => ({
-  ...task,
-  createdAt: new Date(Date.now() - task.createdAtDaysAgo * 24 * 60 * 60 * 1000),
-  dueDate: task.dueDateDaysFromNow !== undefined
-    ? new Date(Date.now() + task.dueDateDaysFromNow * 24 * 60 * 60 * 1000)
-    : undefined,
-}));
 
 function SortableCard({ task, isOverlay = false }: { task: Task; isOverlay?: boolean }) {
   const {
@@ -102,58 +94,194 @@ function SortableCard({ task, isOverlay = false }: { task: Task; isOverlay?: boo
 
 function DroppableColumn({
   id,
-  children,
   title,
   count,
   badgeColor,
-  isEmpty,
+  tasks,
 }: {
   id: string;
-  children: React.ReactNode;
   title: string;
   count: number;
   badgeColor: string;
-  isEmpty: boolean;
+  tasks: Task[];
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef } = useDroppable({ id });
 
   return (
-    <div ref={setNodeRef} className="flex-shrink-0 w-[340px]">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="font-semibold text-lg">{title}</h2>
-          <span className={`${badgeColor} text-white text-xs font-medium px-2.5 py-0.5 rounded-full`}>
-            {count}
-          </span>
-        </div>
-        <button className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg">
-          <Plus className="w-5 h-5" />
-        </button>
+    <div className="flex-shrink-0 w-[340px]">
+      <div className="flex items-center gap-2 mb-4">
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        <span
+          className={`${badgeColor} text-white text-xs px-2 py-1 rounded-full min-w-[24px] text-center`}
+        >
+          {count}
+        </span>
       </div>
-
-      <div className={`min-h-[200px] p-3 rounded-lg border-2 transition-all duration-200 ${isOver && isEmpty
-          ? 'border-blue-300 border-dashed bg-blue-50'
-          : 'border-transparent'
-        }`}>
-        <div className="space-y-4">
-          {children}
-          {isOver && !isEmpty && (
-            <div className="h-1 bg-blue-400 rounded-full animate-pulse mt-4" />
-          )}
-        </div>
+      <div ref={setNodeRef} className="space-y-4 min-h-[200px]">
+        {tasks.map((task) => (
+          <SortableCard key={task.id} task={task} />
+        ))}
       </div>
     </div>
   );
 }
 
-export default function DashboardPage() {
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+export default function Dashboard() {
+  const router = useRouter();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [currentProject, setCurrentProject] = useState<any>(null);
 
   useEffect(() => {
     setIsMounted(true);
+    checkAuthAndLoadData();
   }, []);
+
+  const checkAuthAndLoadData = async () => {
+    try {
+      // Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+
+      // Load user's first project and its issues
+      await loadIssues(session.user.id);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      setLoading(false);
+    }
+  };
+
+  const loadIssues = async (userId: string) => {
+    try {
+      // Get user's first team
+      const { data: teamMembers, error: teamError } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", userId)
+        .limit(1);
+
+      if (teamError) throw teamError;
+      if (!teamMembers || teamMembers.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const teamId = teamMembers[0].team_id;
+
+      // Get first project of this team
+      const { data: projects, error: projectError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("team_id", teamId)
+        .eq("is_archived", false)
+        .is("deleted_at", null)
+        .limit(1);
+
+      if (projectError) throw projectError;
+      if (!projects || projects.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const project = projects[0];
+      setCurrentProject(project);
+
+      // Get issues with relations
+      const { data: issues, error: issuesError } = await supabase
+        .from("issues")
+        .select(`
+          *,
+          assignee:assignee_user_id(id, name, profile_image),
+          creator:creator_id(id, name, profile_image),
+          issue_labels(
+            label:label_id(id, name, color)
+          )
+        `)
+        .eq("project_id", project.id)
+        .is("deleted_at", null)
+        .order("position", { ascending: true });
+
+      if (issuesError) throw issuesError;
+
+      // Get comments count for each issue
+      const issueIds = issues?.map(i => i.id) || [];
+      const { data: commentsData } = await supabase
+        .from("comments")
+        .select("issue_id")
+        .in("issue_id", issueIds)
+        .is("deleted_at", null);
+
+      const commentsCount = commentsData?.reduce((acc: Record<string, number>, comment) => {
+        acc[comment.issue_id] = (acc[comment.issue_id] || 0) + 1;
+        return acc;
+      }, {}) || {};
+
+      // Transform issues to Task format
+      const transformedTasks: Task[] = (issues || []).map((issue: any) => {
+        // Map status to kanban columns
+        let status: TaskStatus = "Backlog";
+        if (issue.status === "To Do") status = "To Do";
+        else if (issue.status === "In Progress") status = "In Progress";
+        else if (issue.status === "Done") status = "Done";
+
+        // Map priority
+        const priorityMap: Record<string, "low" | "medium" | "high"> = {
+          LOW: "low",
+          MEDIUM: "medium",
+          HIGH: "high",
+        };
+
+        // Get labels
+        const labels = issue.issue_labels?.map((il: any) => ({
+          label: il.label.name,
+          variant: "default" as BadgeVariant,
+        })) || [];
+
+        // Get priority badge variant
+        const priorityVariant: BadgeVariant =
+          issue.priority === "HIGH" ? "danger" :
+          issue.priority === "MEDIUM" ? "warning" : "success";
+
+        // Add priority badge at the beginning
+        const allBadges = [
+          { label: issue.priority, variant: priorityVariant },
+          ...labels
+        ];
+
+        // Get assignee
+        const assignees = issue.assignee ? [{
+          name: issue.assignee.name,
+          avatar: issue.assignee.profile_image || `https://i.pravatar.cc/150?u=${issue.assignee.id}`,
+        }] : [];
+
+        return {
+          id: issue.id,
+          status,
+          title: issue.title,
+          description: issue.description || undefined,
+          badges: allBadges,
+          assignees,
+          attachments: 0, // Not tracked in current schema
+          comments: commentsCount[issue.id] || 0,
+          priority: priorityMap[issue.priority] || "medium",
+          createdAt: new Date(issue.created_at),
+          dueDate: issue.due_date ? new Date(issue.due_date) : undefined,
+        };
+      });
+
+      setTasks(transformedTasks);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error loading issues:", error);
+      setLoading(false);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -163,7 +291,7 @@ export default function DashboardPage() {
     })
   );
 
-  if (!isMounted) {
+  if (!isMounted || loading) {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Header Skeleton */}
@@ -232,7 +360,7 @@ export default function DashboardPage() {
     setActiveId(event.active.id as string);
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over) {
@@ -240,39 +368,47 @@ export default function DashboardPage() {
       return;
     }
 
-    const activeId = active.id as string;
+    const activeTask = tasks.find((t) => t.id === active.id);
     const overId = over.id as string;
 
-    const activeTask = tasks.find((t) => t.id === activeId);
-    if (!activeTask) {
-      setActiveId(null);
-      return;
-    }
-
+    // Determine new status based on drop zone
     let newStatus: TaskStatus | null = null;
-    if (overId === "todo" || overId === "inProgress" || overId === "completed") {
-      newStatus = overId as TaskStatus;
-    } else {
-      const overTask = tasks.find((t) => t.id === overId);
-      if (overTask) {
-        newStatus = overTask.status;
-      }
+    if (overId === "backlog" || tasks.find((t) => t.id === overId)?.status === "Backlog") {
+      newStatus = "Backlog";
+    } else if (overId === "todo" || tasks.find((t) => t.id === overId)?.status === "To Do") {
+      newStatus = "To Do";
+    } else if (overId === "inProgress" || tasks.find((t) => t.id === overId)?.status === "In Progress") {
+      newStatus = "In Progress";
+    } else if (overId === "completed" || tasks.find((t) => t.id === overId)?.status === "Done") {
+      newStatus = "Done";
     }
 
-    if (newStatus && activeTask.status !== newStatus) {
-      setTasks((tasks) =>
-        tasks.map((task) =>
-          task.id === activeId ? { ...task, status: newStatus as TaskStatus } : task
-        )
-      );
+    if (activeTask && newStatus && activeTask.status !== newStatus) {
+      // Update in database
+      const { error } = await supabase
+        .from("issues")
+        .update({ status: newStatus })
+        .eq("id", activeTask.id);
+
+      if (!error) {
+        // Update local state
+        setTasks((prevTasks) =>
+          prevTasks.map((t) =>
+            t.id === activeTask.id ? { ...t, status: newStatus! } : t
+          )
+        );
+      } else {
+        console.error("Error updating issue status:", error);
+      }
     }
 
     setActiveId(null);
   };
 
-  const todoTasks = tasks.filter((t) => t.status === "todo");
-  const inProgressTasks = tasks.filter((t) => t.status === "inProgress");
-  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const backlogTasks = tasks.filter((t) => t.status === "Backlog");
+  const todoTasks = tasks.filter((t) => t.status === "To Do");
+  const inProgressTasks = tasks.filter((t) => t.status === "In Progress");
+  const completedTasks = tasks.filter((t) => t.status === "Done");
 
   const activeTask = tasks.find((t) => t.id === activeId);
 
@@ -282,9 +418,10 @@ export default function DashboardPage() {
 
   // Status data for pie chart
   const statusData = [
+    { name: "Backlog", value: backlogTasks.length, color: "#6b7280" },
     { name: "To Do", value: todoTasks.length, color: "#a855f7" },
     { name: "In Progress", value: inProgressTasks.length, color: "#ec4899" },
-    { name: "Completed", value: completedTasks.length, color: "#c084fc" },
+    { name: "Done", value: completedTasks.length, color: "#c084fc" },
   ];
 
   // Priority data for bar chart
@@ -309,7 +446,7 @@ export default function DashboardPage() {
   const now = Date.now();
   const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
   const upcomingDeadlines = tasks
-    .filter((t) => t.dueDate && t.dueDate.getTime() > now && t.dueDate.getTime() <= sevenDaysLater && t.status !== "completed")
+    .filter((t) => t.dueDate && t.dueDate.getTime() > now && t.dueDate.getTime() <= sevenDaysLater && t.status !== "Done")
     .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0))
     .slice(0, 5);
 
@@ -322,8 +459,10 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-8 py-6">
-          <div className="text-sm text-gray-500 mb-2">Project / Litmers / Board</div>
-          <h1 className="text-4xl font-bold mb-6">Litmers AI Issue Tracker</h1>
+          <div className="text-sm text-gray-500 mb-2">
+            Project / {currentProject?.name || "Loading..."} / Board
+          </div>
+          <h1 className="text-4xl font-bold mb-6">{currentProject?.name || "Project Board"}</h1>
 
           {/* Navigation Tabs */}
           <div className="flex items-center justify-between">
@@ -332,7 +471,7 @@ export default function DashboardPage() {
               <button className="pb-3 text-gray-900 border-b-2 border-gray-900 font-medium">Boards</button>
               <button className="pb-3 text-gray-500 hover:text-gray-900">Timeline</button>
               <button className="pb-3 text-gray-500 hover:text-gray-900">Activities</button>
-              <button className="pb-3 text-gray-500 hover:text-gray-900">Files</button>
+              <button className="pb-3 text-gray-500 hover:text-gray-900">All</button>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -356,7 +495,7 @@ export default function DashboardPage() {
             <div className="bg-white rounded-lg p-6 border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Total Tasks</p>
+                  <p className="text-sm text-gray-500 mb-1">Total Issues</p>
                   <p className="text-3xl font-bold">{totalTasks}</p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -526,6 +665,17 @@ export default function DashboardPage() {
         {/* Kanban Board */}
         <div className="px-8 pb-8">
           <div className="flex gap-6 overflow-x-auto">
+            {/* BACKLOG Column */}
+            <SortableContext items={backlogTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+              <DroppableColumn
+                id="backlog"
+                title="BACKLOG"
+                count={backlogTasks.length}
+                badgeColor="bg-gray-500"
+                tasks={backlogTasks}
+              />
+            </SortableContext>
+
             {/* TO DO Column */}
             <SortableContext items={todoTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               <DroppableColumn
@@ -533,12 +683,8 @@ export default function DashboardPage() {
                 title="TO DO"
                 count={todoTasks.length}
                 badgeColor="bg-purple-500"
-                isEmpty={todoTasks.length === 0}
-              >
-                {todoTasks.map((task) => (
-                  <SortableCard key={task.id} task={task} />
-                ))}
-              </DroppableColumn>
+                tasks={todoTasks}
+              />
             </SortableContext>
 
             {/* IN PROGRESS Column */}
@@ -548,27 +694,19 @@ export default function DashboardPage() {
                 title="IN PROGRESS"
                 count={inProgressTasks.length}
                 badgeColor="bg-pink-500"
-                isEmpty={inProgressTasks.length === 0}
-              >
-                {inProgressTasks.map((task) => (
-                  <SortableCard key={task.id} task={task} />
-                ))}
-              </DroppableColumn>
+                tasks={inProgressTasks}
+              />
             </SortableContext>
 
-            {/* COMPLETED Column */}
+            {/* DONE Column */}
             <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               <DroppableColumn
                 id="completed"
-                title="COMPLETED"
+                title="DONE"
                 count={completedTasks.length}
                 badgeColor="bg-purple-400"
-                isEmpty={completedTasks.length === 0}
-              >
-                {completedTasks.map((task) => (
-                  <SortableCard key={task.id} task={task} />
-                ))}
-              </DroppableColumn>
+                tasks={completedTasks}
+              />
             </SortableContext>
           </div>
         </div>
@@ -576,7 +714,7 @@ export default function DashboardPage() {
 
       <DragOverlay>
         {activeTask ? (
-          <div className="w-[340px]">
+          <div className="opacity-80">
             <KanbanCard
               image={activeTask.image}
               badges={activeTask.badges}
