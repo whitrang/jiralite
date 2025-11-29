@@ -1,4 +1,5 @@
 import { openai, GPT_CONFIG } from '@/lib/openai';
+import { checkRateLimit, incrementRateLimit } from './aiRateLimit';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -28,7 +29,7 @@ export async function chatCompletion(
       messages: messages,
       temperature: options?.temperature ?? GPT_CONFIG.temperature,
       max_tokens: options?.max_tokens || GPT_CONFIG.max_tokens,
-      stream: options?.stream || false,
+      stream: false,
     });
 
     return response.choices[0]?.message?.content || '';
@@ -71,17 +72,27 @@ export async function streamChatCompletion(
 }
 
 /**
- * Simple helper to send a single message to GPT
+ * Simple helper to send a single message to GPT with rate limiting
  * @param prompt - The user's prompt
  * @param systemMessage - Optional system message to set context
  * @param options - Optional configuration overrides
+ * @param userId - User ID for rate limiting (optional)
  * @returns The assistant's response text
  */
 export async function askGPT(
   prompt: string,
   systemMessage?: string,
-  options?: ChatCompletionOptions
+  options?: ChatCompletionOptions,
+  userId?: string
 ): Promise<string> {
+  // Check rate limit if userId is provided
+  if (userId) {
+    const rateLimitCheck = await checkRateLimit(userId);
+    if (!rateLimitCheck.allowed) {
+      throw new Error(rateLimitCheck.error || 'Rate limit exceeded');
+    }
+  }
+
   const messages: ChatMessage[] = [];
 
   if (systemMessage) {
@@ -90,7 +101,14 @@ export async function askGPT(
 
   messages.push({ role: 'user', content: prompt });
 
-  return chatCompletion(messages, options);
+  const response = await chatCompletion(messages, options);
+
+  // Increment rate limit counter after successful request
+  if (userId) {
+    await incrementRateLimit(userId);
+  }
+
+  return response;
 }
 
 /**

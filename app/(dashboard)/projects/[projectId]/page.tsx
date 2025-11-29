@@ -1,7 +1,7 @@
 "use client";
 
 import { KanbanCard } from "@/components/ui/kanban-card";
-import { Filter, Search, X, Edit2, Trash2, Send } from "lucide-react";
+import { Filter, Search, X, Edit2, Trash2, Send, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   DndContext,
@@ -21,6 +21,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { use } from "react";
 import { getProjectIssues } from "@/lib/api/issues";
 import { getProjectById } from "@/lib/api/projects";
+import { askGPT } from "@/lib/api/gpt";
+import {
+  getCachedAiAdvice,
+  setCachedAiAdvice,
+  getCachedLabelRecommendations,
+  setCachedLabelRecommendations,
+  invalidateAllAiCaches,
+  validateDescriptionForAI,
+} from "@/lib/api/aiCache";
 import {
   Dialog,
   DialogContent,
@@ -208,6 +217,10 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
   const [projectLabels, setProjectLabels] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [aiAdvice, setAiAdvice] = useState<string>("");
+  const [isLoadingAiAdvice, setIsLoadingAiAdvice] = useState(false);
+  const [recommendedLabels, setRecommendedLabels] = useState<any[]>([]);
+  const [isLoadingLabelRecommendations, setIsLoadingLabelRecommendations] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -720,6 +733,9 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       setEditedTitle(issue.title);
       setEditedDescription(issue.description || "");
       setIsIssueDetailOpen(true);
+      // Reset AI data when opening new issue
+      setAiAdvice("");
+      setRecommendedLabels([]);
       // Load comments for this issue
       loadComments(issue.id);
     }
@@ -788,6 +804,12 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
     if (!selectedIssue) return;
 
     await handleUpdateIssueField("description", editedDescription.trim() || null);
+
+    // Invalidate AI caches when description is updated
+    invalidateAllAiCaches(selectedIssue.id);
+    setAiAdvice("");
+    setRecommendedLabels([]);
+
     setIsEditingDescription(false);
   };
 
@@ -904,6 +926,209 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
     } else {
       console.error("Error adding label:", error);
     }
+  };
+
+  const handleGetAiAdvice = async () => {
+    if (!selectedIssue || !currentUser) return;
+
+    // Validate description length
+    const validation = validateDescriptionForAI(selectedIssue.description);
+    if (!validation.valid) {
+      setAiAdvice(`⚠️ ${validation.message}`);
+      return;
+    }
+
+    setIsLoadingAiAdvice(true);
+    setAiAdvice("");
+
+    try {
+      // Check cache first
+      const cached = getCachedAiAdvice(
+        selectedIssue.id,
+        selectedIssue.updated_at || selectedIssue.created_at
+      );
+
+      if (cached) {
+        setAiAdvice(`[Cached Result]\n\n${cached}`);
+        setIsLoadingAiAdvice(false);
+        return;
+      }
+
+      const issueContext = `
+Title: ${selectedIssue.title}
+Description: ${selectedIssue.description || "No description provided"}
+Priority: ${selectedIssue.priority}
+Status: ${selectedIssue.status}
+`;
+
+      const prompt = `Based on the following task/issue, please provide:
+1. A detailed todo list (step-by-step tasks) to complete this work
+2. An estimated time range to complete this task
+
+${issueContext}
+
+IMPORTANT: Provide your response in PLAIN TEXT ONLY. Do NOT use any markdown formatting like **, *, #, -, or any other markdown syntax. Just use plain text with line breaks and simple numbering like 1., 2., 3.`;
+
+      const response = await askGPT(
+        prompt,
+        "You are a helpful project management assistant. Provide practical, actionable advice for software development tasks. Always respond in plain text without any markdown formatting.",
+        undefined,
+        currentUser.id
+      );
+
+      // Cache the result
+      setCachedAiAdvice(
+        selectedIssue.id,
+        response,
+        selectedIssue.updated_at || selectedIssue.created_at
+      );
+
+      setAiAdvice(response);
+    } catch (error: any) {
+      console.error("Error getting AI advice:", error);
+      if (error.message && error.message.includes('Rate limit')) {
+        setAiAdvice(`⚠️ ${error.message}`);
+      } else if (error.message && error.message.includes('API key')) {
+        setAiAdvice("⚠️ Failed to get AI advice. Please make sure your OpenAI API key is configured.");
+      } else {
+        setAiAdvice(`⚠️ Failed to get AI advice: ${error.message || 'Unknown error'}`);
+      }
+    } finally {
+      setIsLoadingAiAdvice(false);
+    }
+  };
+
+  const handleGetLabelRecommendations = async () => {
+    if (!selectedIssue || !currentUser || !currentProject) return;
+
+    // Validate description length
+    const validation = validateDescriptionForAI(selectedIssue.description);
+    if (!validation.valid) {
+      alert(`⚠️ ${validation.message}`);
+      return;
+    }
+
+    setIsLoadingLabelRecommendations(true);
+    setRecommendedLabels([]);
+
+    try {
+      // Get available labels for this project
+      const availableLabels = projectLabels.filter(
+        (label: any) => !selectedIssue.issue_labels?.some((il: any) => il.label.id === label.id)
+      );
+
+      if (availableLabels.length === 0) {
+        setRecommendedLabels([]);
+        setIsLoadingLabelRecommendations(false);
+        return;
+      }
+
+      // Check cache first
+      const cached = getCachedLabelRecommendations(
+        selectedIssue.id,
+        selectedIssue.updated_at || selectedIssue.created_at
+      );
+
+      if (cached) {
+        // Parse cached response
+        const trimmedResponse = cached.trim().toLowerCase();
+
+        if (trimmedResponse !== 'none' && trimmedResponse) {
+          const recommendedLabelNames = trimmedResponse
+            .split(',')
+            .map(name => name.trim())
+            .filter(name => name.length > 0)
+            .slice(0, 3);
+
+          const recommended = availableLabels.filter((label: any) =>
+            recommendedLabelNames.some(name =>
+              label.name.toLowerCase() === name || label.name.toLowerCase().includes(name)
+            )
+          ).slice(0, 3);
+
+          setRecommendedLabels(recommended);
+        }
+        setIsLoadingLabelRecommendations(false);
+        return;
+      }
+
+      const issueContext = `
+Title: ${selectedIssue.title}
+Description: ${selectedIssue.description || "No description provided"}
+Priority: ${selectedIssue.priority}
+`;
+
+      const labelsContext = availableLabels.map((l: any) => l.name).join(", ");
+
+      const prompt = `Based on the following issue, recommend up to 3 most relevant labels from the available labels list.
+
+Issue:
+${issueContext}
+
+Available Labels: ${labelsContext}
+
+IMPORTANT:
+1. Only recommend labels from the available labels list
+2. Recommend maximum 3 labels
+3. Respond ONLY with the label names separated by commas (e.g., "bug, urgent, backend")
+4. If no labels are relevant, respond with "none"
+5. Do NOT include any other text or explanation`;
+
+      const response = await askGPT(
+        prompt,
+        "You are a helpful assistant that categorizes issues. Only respond with label names or 'none'.",
+        undefined,
+        currentUser.id
+      );
+
+      // Cache the result
+      setCachedLabelRecommendations(
+        selectedIssue.id,
+        response,
+        selectedIssue.updated_at || selectedIssue.created_at
+      );
+
+      // Parse response
+      const trimmedResponse = response.trim().toLowerCase();
+
+      if (trimmedResponse === 'none' || !trimmedResponse) {
+        setRecommendedLabels([]);
+        return;
+      }
+
+      const recommendedLabelNames = trimmedResponse
+        .split(',')
+        .map(name => name.trim())
+        .filter(name => name.length > 0)
+        .slice(0, 3);
+
+      const recommended = availableLabels.filter((label: any) =>
+        recommendedLabelNames.some(name =>
+          label.name.toLowerCase() === name || label.name.toLowerCase().includes(name)
+        )
+      ).slice(0, 3);
+
+      setRecommendedLabels(recommended);
+    } catch (error: any) {
+      console.error("Error getting label recommendations:", error);
+      if (error.message && error.message.includes('Rate limit')) {
+        alert(`⚠️ ${error.message}`);
+      } else {
+        alert(`⚠️ Failed to get label recommendations: ${error.message || 'Unknown error'}`);
+      }
+      setRecommendedLabels([]);
+    } finally {
+      setIsLoadingLabelRecommendations(false);
+    }
+  };
+
+  const handleAcceptLabelRecommendation = async (labelId: string) => {
+    await handleAddLabel(labelId);
+    setRecommendedLabels(prev => prev.filter((l: any) => l.id !== labelId));
+  };
+
+  const handleRejectLabelRecommendation = (labelId: string) => {
+    setRecommendedLabels(prev => prev.filter((l: any) => l.id !== labelId));
   };
 
   return (
@@ -1417,9 +1642,33 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
 
                 {/* Labels Section */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Labels
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Labels
+                    </label>
+                    {projectLabels.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleGetLabelRecommendations}
+                        disabled={isLoadingLabelRecommendations || !validateDescriptionForAI(selectedIssue.description).valid}
+                        className="text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!validateDescriptionForAI(selectedIssue.description).valid ? "Description must be at least 10 characters" : ""}
+                      >
+                        {isLoadingLabelRecommendations ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mr-1" />
+                            Getting...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            AI Recommend
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                   <div className="space-y-3">
                     {/* Current Labels */}
                     <div className="flex flex-wrap gap-2">
@@ -1441,6 +1690,49 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
                         <span className="text-sm text-gray-400">No labels</span>
                       )}
                     </div>
+
+                    {/* AI Recommended Labels */}
+                    {recommendedLabels.length > 0 && (
+                      <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles className="w-4 h-4 text-purple-600" />
+                          <span className="text-xs font-semibold text-purple-900">
+                            AI Recommended Labels
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {recommendedLabels.map((label: any) => (
+                            <div
+                              key={label.id}
+                              className="inline-flex items-center gap-1"
+                            >
+                              <span
+                                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white"
+                                style={{ backgroundColor: label.color }}
+                              >
+                                {label.name}
+                              </span>
+                              <button
+                                onClick={() => handleAcceptLabelRecommendation(label.id)}
+                                className="p-1 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors"
+                                title="Accept"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleRejectLabelRecommendation(label.id)}
+                                className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                                title="Reject"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Add Label Dropdown */}
                     {(() => {
@@ -1536,6 +1828,60 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
                       {selectedIssue.description || (
                         <span className="text-gray-400 italic">No description provided</span>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Advice Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium text-gray-700">
+                      AI Advice
+                    </label>
+                    <Button
+                      size="sm"
+                      onClick={handleGetAiAdvice}
+                      disabled={isLoadingAiAdvice || !validateDescriptionForAI(selectedIssue.description).valid}
+                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!validateDescriptionForAI(selectedIssue.description).valid ? "Description must be at least 10 characters" : ""}
+                    >
+                      {isLoadingAiAdvice ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Thinking...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Get AI Advice
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {!aiAdvice && !isLoadingAiAdvice && (
+                    <div className="p-4 border border-dashed border-gray-300 rounded-lg bg-gray-50 text-center">
+                      <Sparkles className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm text-gray-600 mb-1">
+                        Get AI-powered suggestions for this task
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        AI will create a detailed todo list and estimate completion time
+                      </p>
+                    </div>
+                  )}
+
+                  {aiAdvice && (
+                    <div className="p-4 border border-purple-200 rounded-lg bg-gradient-to-br from-purple-50 to-pink-50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Sparkles className="w-5 h-5 text-purple-600" />
+                        <span className="text-sm font-semibold text-purple-900">
+                          AI Recommendations
+                        </span>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-gray-800 whitespace-pre-wrap">
+                        {aiAdvice}
+                      </div>
                     </div>
                   )}
                 </div>
