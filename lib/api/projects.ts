@@ -1,7 +1,39 @@
 import { supabase } from '@/lib/supabaseClient';
 import { Database } from '@/lib/database.types';
+import { verifyTeamMembership } from './teams';
 
 type Project = Database['public']['Tables']['projects']['Row'];
+
+// Helper function to verify project access through team membership
+async function verifyProjectAccess(
+  projectId: string,
+  userId: string
+): Promise<{ hasAccess: boolean; teamId: string | null; role: 'OWNER' | 'ADMIN' | 'MEMBER' | null }> {
+  try {
+    // Get project's team_id
+    const { data: project, error } = await supabase
+      .from('projects')
+      .select('team_id')
+      .eq('id', projectId)
+      .is('deleted_at', null)
+      .single();
+
+    if (error || !project) {
+      return { hasAccess: false, teamId: null, role: null };
+    }
+
+    // Verify team membership
+    const { isMember, role } = await verifyTeamMembership(project.team_id, userId);
+
+    return {
+      hasAccess: isMember,
+      teamId: project.team_id,
+      role,
+    };
+  } catch (error) {
+    return { hasAccess: false, teamId: null, role: null };
+  }
+}
 
 // Create a new project
 export async function createProject(
@@ -11,6 +43,13 @@ export async function createProject(
   ownerId: string
 ): Promise<Project> {
   try {
+    // Verify team membership
+    const { isMember } = await verifyTeamMembership(teamId, ownerId);
+
+    if (!isMember) {
+      throw new Error('FORBIDDEN');
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
@@ -32,8 +71,15 @@ export async function createProject(
 }
 
 // Get all projects for a team
-export async function getTeamProjects(teamId: string): Promise<Project[]> {
+export async function getTeamProjects(teamId: string, userId: string): Promise<Project[]> {
   try {
+    // Verify team membership
+    const { isMember } = await verifyTeamMembership(teamId, userId);
+
+    if (!isMember) {
+      throw new Error('NOT_FOUND');
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -50,8 +96,16 @@ export async function getTeamProjects(teamId: string): Promise<Project[]> {
 }
 
 // Get a single project by ID
-export async function getProjectById(projectId: string): Promise<Project | null> {
+export async function getProjectById(projectId: string, userId?: string): Promise<Project | null> {
   try {
+    // If userId is provided, verify access
+    if (userId) {
+      const { hasAccess } = await verifyProjectAccess(projectId, userId);
+      if (!hasAccess) {
+        throw new Error('NOT_FOUND');
+      }
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .select('*')
@@ -71,9 +125,21 @@ export async function getProjectById(projectId: string): Promise<Project | null>
 export async function updateProject(
   projectId: string,
   name: string,
-  description: string | null
+  description: string | null,
+  userId: string
 ): Promise<Project> {
   try {
+    // Verify project access
+    const { hasAccess, role } = await verifyProjectAccess(projectId, userId);
+
+    if (!hasAccess) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new Error('FORBIDDEN');
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .update({ name, description })
@@ -92,9 +158,21 @@ export async function updateProject(
 // Archive/Unarchive project
 export async function toggleProjectArchive(
   projectId: string,
-  isArchived: boolean
+  isArchived: boolean,
+  userId: string
 ): Promise<void> {
   try {
+    // Verify project access
+    const { hasAccess, role } = await verifyProjectAccess(projectId, userId);
+
+    if (!hasAccess) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new Error('FORBIDDEN');
+    }
+
     const { error } = await supabase
       .from('projects')
       .update({ is_archived: isArchived })
@@ -108,8 +186,19 @@ export async function toggleProjectArchive(
 }
 
 // Delete project (soft delete)
-export async function deleteProject(projectId: string): Promise<void> {
+export async function deleteProject(projectId: string, userId: string): Promise<void> {
   try {
+    // Verify project access
+    const { hasAccess, role } = await verifyProjectAccess(projectId, userId);
+
+    if (!hasAccess) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new Error('FORBIDDEN');
+    }
+
     const { error } = await supabase
       .from('projects')
       .update({ deleted_at: new Date().toISOString() })

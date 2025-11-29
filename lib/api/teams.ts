@@ -15,6 +15,29 @@ export interface TeamMemberWithUser extends TeamMember {
   user: User;
 }
 
+// Helper function to verify team membership
+export async function verifyTeamMembership(
+  teamId: string,
+  userId: string
+): Promise<{ isMember: boolean; role: 'OWNER' | 'ADMIN' | 'MEMBER' | null }> {
+  try {
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('role')
+      .eq('team_id', teamId)
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      return { isMember: false, role: null };
+    }
+
+    return { isMember: true, role: data.role };
+  } catch (error) {
+    return { isMember: false, role: null };
+  }
+}
+
 // Get all teams for the current user
 export async function getUserTeams(userId: string): Promise<TeamWithRole[]> {
   try {
@@ -95,8 +118,19 @@ export async function createTeam(name: string, ownerId: string): Promise<Team> {
 }
 
 // Update team name
-export async function updateTeam(teamId: string, name: string): Promise<Team> {
+export async function updateTeam(teamId: string, name: string, userId: string): Promise<Team> {
   try {
+    // Verify team membership and role
+    const { isMember, role } = await verifyTeamMembership(teamId, userId);
+
+    if (!isMember) {
+      throw new Error('NOT_FOUND');
+    }
+
+    if (role !== 'OWNER' && role !== 'ADMIN') {
+      throw new Error('FORBIDDEN');
+    }
+
     const { data, error } = await supabase
       .from('teams')
       .update({ name })
@@ -115,17 +149,15 @@ export async function updateTeam(teamId: string, name: string): Promise<Team> {
 // Delete a team (soft delete) - Only OWNER can delete
 export async function deleteTeam(teamId: string, userId: string): Promise<void> {
   try {
-    // Check if user is the owner
-    const { data: team, error: teamError } = await supabase
-      .from('teams')
-      .select('owner_id')
-      .eq('id', teamId)
-      .single();
+    // Verify team membership and role
+    const { isMember, role } = await verifyTeamMembership(teamId, userId);
 
-    if (teamError) throw teamError;
+    if (!isMember) {
+      throw new Error('NOT_FOUND');
+    }
 
-    if (team.owner_id !== userId) {
-      throw new Error('Only team owner can delete the team');
+    if (role !== 'OWNER') {
+      throw new Error('FORBIDDEN');
     }
 
     // Soft delete the team
@@ -144,9 +176,17 @@ export async function deleteTeam(teamId: string, userId: string): Promise<void> 
   }
 }
 
-// Get team by ID
-export async function getTeamById(teamId: string): Promise<Team | null> {
+// Get team by ID (with membership verification)
+export async function getTeamById(teamId: string, userId?: string): Promise<Team | null> {
   try {
+    // If userId is provided, verify membership
+    if (userId) {
+      const { isMember } = await verifyTeamMembership(teamId, userId);
+      if (!isMember) {
+        throw new Error('NOT_FOUND');
+      }
+    }
+
     const { data, error } = await supabase
       .from('teams')
       .select('*')
