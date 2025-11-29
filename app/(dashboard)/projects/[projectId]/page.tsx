@@ -1,7 +1,7 @@
 "use client";
 
 import { KanbanCard } from "@/components/ui/kanban-card";
-import { Filter, Search, X, Edit2, Trash2, Send, Sparkles, MessageSquare } from "lucide-react";
+import { Filter, Search, X, Edit2, Trash2, Send, Sparkles, MessageSquare, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   DndContext,
@@ -226,6 +226,15 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
   const [isLoadingLabelRecommendations, setIsLoadingLabelRecommendations] = useState(false);
   const [commentSummary, setCommentSummary] = useState<string>("");
   const [isLoadingCommentSummary, setIsLoadingCommentSummary] = useState(false);
+  const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
+  const [newIssueTitle, setNewIssueTitle] = useState("");
+  const [newIssueDescription, setNewIssueDescription] = useState("");
+  const [newIssuePriority, setNewIssuePriority] = useState("MEDIUM");
+  const [newIssueStatus, setNewIssueStatus] = useState("Backlog");
+  const [newIssueDueDate, setNewIssueDueDate] = useState("");
+  const [newIssueLabels, setNewIssueLabels] = useState<string[]>([]);
+  const [newIssueRecommendedLabels, setNewIssueRecommendedLabels] = useState<any[]>([]);
+  const [isLoadingNewIssueLabelRecommendations, setIsLoadingNewIssueLabelRecommendations] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -1235,6 +1244,61 @@ IMPORTANT:
     setRecommendedLabels(prev => prev.filter((l: any) => l.id !== labelId));
   };
 
+  const handleCreateIssue = async () => {
+    if (!currentUser || !currentProject) return;
+    if (!newIssueTitle.trim()) {
+      alert("Please enter a title for the issue");
+      return;
+    }
+
+    try {
+      const { data: newIssue, error } = await supabase
+        .from("issues")
+        .insert({
+          title: newIssueTitle.trim(),
+          description: newIssueDescription.trim() || null,
+          status: newIssueStatus,
+          priority: newIssuePriority,
+          due_date: newIssueDueDate || null,
+          position: 0,
+          project_id: currentProject.id,
+          creator_id: currentUser.id,
+        })
+        .select()
+        .single();
+
+      if (!error && newIssue) {
+        // Add labels if any were selected
+        if (newIssueLabels.length > 0) {
+          const labelInserts = newIssueLabels.map((labelId) => ({
+            issue_id: newIssue.id,
+            label_id: labelId,
+          }));
+
+          await supabase.from("issue_labels").insert(labelInserts);
+        }
+
+        // Reset form
+        setNewIssueTitle("");
+        setNewIssueDescription("");
+        setNewIssuePriority("MEDIUM");
+        setNewIssueStatus("Backlog");
+        setNewIssueDueDate("");
+        setNewIssueLabels([]);
+        setIsCreateIssueOpen(false);
+
+        // Reload issues
+        await loadProjectIssues(currentProject.id);
+      } else {
+        console.error("Error creating issue:", error);
+        alert("Failed to create issue. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error creating issue:", error);
+      alert("Failed to create issue. Please try again.");
+    }
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -1276,6 +1340,13 @@ IMPORTANT:
           {/* Filter and Sort Actions */}
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setIsCreateIssueOpen(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create Issue
+              </Button>
+
               <button
                 onClick={() => setIsFilterOpen(true)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
@@ -1567,6 +1638,227 @@ IMPORTANT:
               onClick={() => setIsFilterOpen(false)}
             >
               Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Issue Dialog */}
+      <Dialog open={isCreateIssueOpen} onOpenChange={setIsCreateIssueOpen}>
+        <DialogContent className="max-w-[90vw] w-[800px] max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Create New Issue</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Title
+              </label>
+              <input
+                type="text"
+                value={newIssueTitle}
+                onChange={(e) => setNewIssueTitle(e.target.value)}
+                placeholder="Enter issue title..."
+                className="w-full text-lg px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                autoFocus
+              />
+            </div>
+
+            {/* Status, Priority, Assignee Section */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Status
+                </label>
+                <Select
+                  value={newIssueStatus}
+                  onValueChange={(value) => setNewIssueStatus(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="To Do">To Do</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority
+                </label>
+                <Select
+                  value={newIssuePriority}
+                  onValueChange={(value) => setNewIssuePriority(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                        Low
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="MEDIUM">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                        Medium
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="HIGH">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                        High
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="URGENT">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                        Urgent
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Assignee (placeholder for now) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assignee
+                </label>
+                <Select disabled>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                </Select>
+              </div>
+            </div>
+
+            {/* Labels Section */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Labels
+              </label>
+              <div className="space-y-3">
+                {/* Current Labels */}
+                <div className="flex flex-wrap gap-2">
+                  {newIssueLabels.length === 0 ? (
+                    <span className="text-sm text-gray-400">No labels</span>
+                  ) : (
+                    newIssueLabels.map((labelId) => {
+                      const label = projectLabels.find((l: any) => l.id === labelId);
+                      return label ? (
+                        <span
+                          key={label.id}
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium text-white"
+                          style={{ backgroundColor: label.color }}
+                        >
+                          {label.name}
+                          <button
+                            onClick={() => {
+                              setNewIssueLabels(prev => prev.filter(id => id !== labelId));
+                            }}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ) : null;
+                    })
+                  )}
+                </div>
+
+                {/* Add Label Dropdown */}
+                <div>
+                  {(() => {
+                    const availableLabels = projectLabels.filter(
+                      (label: any) => !newIssueLabels.includes(label.id)
+                    );
+                    return availableLabels.length > 0 ? (
+                      <Select
+                        value=""
+                        onValueChange={(value) => {
+                          if (value) {
+                            setNewIssueLabels(prev => [...prev, value]);
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Add label..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLabels.map((label: any) => (
+                            <SelectItem key={label.id} value={label.id}>
+                              {label.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-sm text-gray-500 italic">All labels assigned</span>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Due Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Due Date
+              </label>
+              <input
+                type="date"
+                value={newIssueDueDate}
+                onChange={(e) => setNewIssueDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={newIssueDescription}
+                onChange={(e) => setNewIssueDescription(e.target.value)}
+                placeholder="Add a description..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={8}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCreateIssueOpen(false);
+                setNewIssueTitle("");
+                setNewIssueDescription("");
+                setNewIssuePriority("MEDIUM");
+                setNewIssueStatus("To Do");
+                setNewIssueDueDate("");
+                setNewIssueLabels([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateIssue}
+              disabled={!newIssueTitle.trim()}
+            >
+              Create Issue
             </Button>
           </DialogFooter>
         </DialogContent>
