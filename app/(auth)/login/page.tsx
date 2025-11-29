@@ -50,6 +50,11 @@ export default function LoginPage() {
     });
   };
 
+  const fillTestAccount = (email: string, password: string) => {
+    setFormData({ email, password });
+    setError("");
+  };
+
   return (
     <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
       <h1 className="text-2xl font-bold mb-6">Log In</h1>
@@ -108,6 +113,59 @@ export default function LoginPage() {
           Sign up
         </Link>
       </p>
+
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3">Test Accounts</h2>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => fillTestAccount("john@vietvibe.com", "1q1q1q1q")}
+            className="w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-900">john@vietvibe.com</p>
+                <p className="text-xs text-gray-600">Password: 1q1q1q1q</p>
+              </div>
+              <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                Owner
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fillTestAccount("sarah@vietvibe.com", "1q1q1q1q")}
+            className="w-full text-left p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-900">sarah@vietvibe.com</p>
+                <p className="text-xs text-gray-600">Password: 1q1q1q1q</p>
+              </div>
+              <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                Admin
+              </span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => fillTestAccount("alex@vietvibe.com", "1q1q1q1q")}
+            className="w-full text-left p-3 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200"
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm font-medium text-gray-900">alex@vietvibe.com</p>
+                <p className="text-xs text-gray-600">Password: 1q1q1q1q</p>
+              </div>
+              <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-1 rounded">
+                Member
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

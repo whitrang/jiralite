@@ -207,17 +207,21 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   async function loadActivityLogs(reset: boolean = false) {
     try {
       setIsLoadingActivity(true)
-      const page = reset ? 0 : activityPage
-      const logs = await getTeamActivityLogs(teamId, 10, page * 10)
 
       if (reset) {
+        // Reset to first page
+        const logs = await getTeamActivityLogs(teamId, 10, 0)
         setActivityLogs(logs)
         setActivityPage(0)
+        setHasMoreActivity(logs.length === 10)
       } else {
+        // Load next page
+        const nextPage = activityPage + 1
+        const logs = await getTeamActivityLogs(teamId, 10, nextPage * 10)
         setActivityLogs(prev => [...prev, ...logs])
+        setActivityPage(nextPage)
+        setHasMoreActivity(logs.length === 10)
       }
-
-      setHasMoreActivity(logs.length === 10)
     } catch (err) {
       console.error("Error loading activity logs:", err)
     } finally {
@@ -225,11 +229,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     }
   }
 
-  const loadMoreActivity = () => {
-    if (!isLoadingActivity && hasMoreActivity) {
-      setActivityPage(prev => prev + 1)
-      loadActivityLogs()
-    }
+  const loadMoreActivity = async () => {
+    if (isLoadingActivity || !hasMoreActivity) return
+    await loadActivityLogs(false)
   }
 
   const getActivityIconComponent = (actionType: string) => {

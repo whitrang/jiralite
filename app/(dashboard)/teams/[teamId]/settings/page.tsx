@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { AlertTriangle, SaveIcon, Loader2Icon, LogOutIcon } from "lucide-react"
-import { getTeamById, deleteTeam } from "@/lib/api/teams"
+import { getTeamById, deleteTeam, updateTeam } from "@/lib/api/teams"
 import { getUserRole, leaveTeam } from "@/lib/api/teamMembers"
 import { getCurrentUserId } from "@/lib/api/auth"
 
@@ -31,6 +31,7 @@ export default function TeamSettingsPage({ params }: { params: Promise<{ teamId:
   const { teamId } = use(params)
   const router = useRouter()
   const [teamName, setTeamName] = useState(mockTeamSettings.name)
+  const [originalTeamName, setOriginalTeamName] = useState(mockTeamSettings.name)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<TeamRole | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -56,9 +57,10 @@ export default function TeamSettingsPage({ params }: { params: Promise<{ teamId:
       }
       setCurrentUserId(userId)
 
-      const team = await getTeamById(teamId)
+      const team = await getTeamById(teamId, userId)
       if (team) {
         setTeamName(team.name)
+        setOriginalTeamName(team.name)
       }
 
       const role = await getUserRole(teamId, userId)
@@ -71,11 +73,25 @@ export default function TeamSettingsPage({ params }: { params: Promise<{ teamId:
   }
 
   const handleSaveTeamName = async () => {
-    setIsSaving(true)
-    console.log("Updating team name to:", teamName)
-    setTimeout(() => {
+    if (!currentUserId || !teamName.trim()) return
+
+    try {
+      setIsSaving(true)
+      await updateTeam(teamId, teamName.trim(), currentUserId)
+      setOriginalTeamName(teamName.trim())
+      alert("Team name updated successfully!")
+    } catch (err: any) {
+      console.error("Error updating team name:", err)
+      if (err.message === 'NOT_FOUND') {
+        alert("Team not found or you don't have access.")
+      } else if (err.message === 'FORBIDDEN') {
+        alert("You don't have permission to update team name. Only OWNER and ADMIN can update.")
+      } else {
+        alert("Failed to update team name. Please try again.")
+      }
+    } finally {
       setIsSaving(false)
-    }, 1000)
+    }
   }
 
   const handleDeleteTeam = async () => {
@@ -110,9 +126,10 @@ export default function TeamSettingsPage({ params }: { params: Promise<{ teamId:
     }
   }
 
-  const isTeamNameChanged = teamName !== mockTeamSettings.name
+  const isTeamNameChanged = teamName.trim() !== originalTeamName
   const isOwner = userRole === "OWNER"
   const canLeaveTeam = userRole === "ADMIN" || userRole === "MEMBER"
+  const canEditTeamName = userRole === "OWNER" || userRole === "ADMIN"
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -143,12 +160,14 @@ export default function TeamSettingsPage({ params }: { params: Promise<{ teamId:
                   onChange={(e) => setTeamName(e.target.value)}
                   maxLength={50}
                   placeholder="Enter team name"
+                  disabled={!canEditTeamName || isLoading}
                 />
                 <Button
                   onClick={handleSaveTeamName}
-                  disabled={!isTeamNameChanged || !teamName.trim() || isSaving}
+                  disabled={!canEditTeamName || !isTeamNameChanged || !teamName.trim() || isSaving}
                 >
-                  <SaveIcon />
+                  {isSaving && <Loader2Icon className="animate-spin" />}
+                  {!isSaving && <SaveIcon />}
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
               </div>
