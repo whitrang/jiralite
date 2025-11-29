@@ -26,22 +26,22 @@ export default function DashboardLayout({
       name: "Teams",
       icon: Users,
       href: "/teams",
-    },
-    {
-      name: "Invites",
-      icon: UserPlus,
-      href: "/invites",
-    },
-    {
-      name: "Profile",
-      icon: User,
-      href: "/profile",
-    },
-    {
-      name: "Notifications",
-      icon: Bell,
-      href: "/notifications",
-    },
+    }
+    // {
+    //   name: "Invites",
+    //   icon: UserPlus,
+    //   href: "/invites",
+    // },
+    // {
+    //   name: "Profile",
+    //   icon: User,
+    //   href: "/profile",
+    // },
+    // {
+    //   name: "Notifications",
+    //   icon: Bell,
+    //   href: "/notifications",
+    // },
   ];
 
   return (
