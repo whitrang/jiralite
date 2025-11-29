@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -24,6 +25,7 @@ import { getTeamById } from "@/lib/api/teams"
 import { getTeamMembers, getUserRole, addMembersToTeam, updateMemberRole, removeMember } from "@/lib/api/teamMembers"
 import { getCurrentUserId } from "@/lib/api/auth"
 import { getAllUsers } from "@/lib/api/users"
+import { createProject } from "@/lib/api/projects"
 import { supabase } from "@/lib/supabaseClient"
 
 type TeamRole = "OWNER" | "ADMIN" | "MEMBER"
@@ -85,6 +87,12 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<DisplayMember | null>(null)
   const [isRemoving, setIsRemoving] = useState(false)
+
+  // Create project modal
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false)
+  const [newProjectName, setNewProjectName] = useState("")
+  const [newProjectDescription, setNewProjectDescription] = useState("")
+  const [isCreatingProject, setIsCreatingProject] = useState(false)
 
   useEffect(() => {
     loadTeamData()
@@ -284,6 +292,37 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     return true
   }
 
+  const handleCreateProject = async () => {
+    if (!currentUserId) {
+      alert("Please log in to create a project")
+      return
+    }
+
+    try {
+      setIsCreatingProject(true)
+      await createProject(teamId, newProjectName.trim(), newProjectDescription.trim() || null, currentUserId)
+      setIsCreateProjectModalOpen(false)
+      setNewProjectName("")
+      setNewProjectDescription("")
+
+      // Reload team data to show new project
+      await loadTeamData()
+
+      // Show success message
+      setSuccessMessage("Successfully created project!")
+      setIsSuccessVisible(true)
+      setTimeout(() => {
+        setIsSuccessVisible(false)
+        setTimeout(() => setSuccessMessage(null), 300)
+      }, 5000)
+    } catch (err) {
+      console.error("Error creating project:", err)
+      alert("Failed to create project. Please try again.")
+    } finally {
+      setIsCreatingProject(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
@@ -432,7 +471,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   <FolderIcon className="size-5" />
                   Projects ({activeProjects.length})
                 </CardTitle>
-                <Button onClick={() => router.push(`/teams/${teamId}/projects/new`)}>
+                <Button onClick={() => setIsCreateProjectModalOpen(true)}>
                   <PlusIcon />
                   New Project
                 </Button>
@@ -449,7 +488,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   <p className="text-muted-foreground mb-4">
                     Create your first project to get started
                   </p>
-                  <Button onClick={() => router.push(`/teams/${teamId}/projects/new`)}>
+                  <Button onClick={() => setIsCreateProjectModalOpen(true)}>
                     <PlusIcon />
                     New Project
                   </Button>
@@ -595,6 +634,62 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
             >
               {isInviting && <Loader2Icon className="animate-spin" />}
               Add {selectedUserIds.length > 0 ? `${selectedUserIds.length} ` : ''}Member{selectedUserIds.length !== 1 ? 's' : ''}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Project Modal */}
+      <Dialog open={isCreateProjectModalOpen} onOpenChange={setIsCreateProjectModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create New Project</DialogTitle>
+            <DialogDescription>
+              Create a new project for your team. Project names must be between 1-100 characters.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="project-name" className="text-sm font-medium">
+                Project Name
+              </label>
+              <Input
+                id="project-name"
+                placeholder="Enter project name"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                maxLength={100}
+                disabled={isCreatingProject}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="project-description" className="text-sm font-medium">
+                Description (Optional)
+              </label>
+              <Input
+                id="project-description"
+                placeholder="Enter project description"
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                maxLength={500}
+                disabled={isCreatingProject}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateProjectModalOpen(false)}
+              disabled={isCreatingProject}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={!newProjectName.trim() || isCreatingProject}
+            >
+              {isCreatingProject && <Loader2Icon className="animate-spin" />}
+              Create Project
             </Button>
           </DialogFooter>
         </DialogContent>
