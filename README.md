@@ -36,7 +36,7 @@ Try it out with the test accounts provided on the login page!
 npm install
 ```
 
-3. Set up environment variables (create `.env.local`):
+3. Set up environment variables (create `.env`):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -56,6 +56,7 @@ npm run dev
 ### Authentication Pages
 
 #### Login Page (`/` and `/login`)
+
 - **Location**: `app/page.tsx`, `app/(auth)/login/page.tsx`
 - **Features**:
   - Email/password authentication
@@ -69,10 +70,10 @@ npm run dev
 - **Access**: Public
 
 #### Signup Page (`/signup`)
+
 - **Location**: `app/(auth)/signup/page.tsx`
 - **Features**:
   - User registration with email, password, and name
-  - Automatic team creation for new users
   - Password validation
   - Auto-login after successful signup
   - Link to login page
@@ -81,6 +82,7 @@ npm run dev
 ### Dashboard Pages
 
 #### Teams List (`/teams`)
+
 - **Location**: `app/(dashboard)/teams/page.tsx`
 - **Features**:
   - Display all teams where user is a member
@@ -92,6 +94,7 @@ npm run dev
 - **Permissions**: All team members can view
 
 #### Team Dashboard (`/teams/[teamId]`)
+
 - **Location**: `app/(dashboard)/teams/[teamId]/page.tsx`
 - **Features**:
   - Team overview with member list
@@ -115,6 +118,7 @@ npm run dev
   - Create projects: All members
 
 #### Team Settings (`/teams/[teamId]/settings`)
+
 - **Location**: `app/(dashboard)/teams/[teamId]/settings/page.tsx`
 - **Features**:
   - Team information display
@@ -131,6 +135,7 @@ npm run dev
   - Delete team: Owner only
 
 #### Projects Redirect (`/projects`)
+
 - **Location**: `app/(dashboard)/projects/page.tsx`
 - **Features**:
   - Automatic redirect to oldest non-deleted project
@@ -140,6 +145,7 @@ npm run dev
 - **Purpose**: Entry point for project management
 
 #### Project Kanban Board (`/projects/[projectId]`)
+
 - **Location**: `app/(dashboard)/projects/[projectId]/page.tsx`
 - **Features**:
   - Kanban board with drag-and-drop functionality
@@ -167,6 +173,7 @@ npm run dev
 ### Dashboard Layout
 
 #### Main Layout (`/dashboard/*`)
+
 - **Location**: `app/(dashboard)/layout.tsx`
 - **Features**:
   - Top navigation bar with:
@@ -183,6 +190,7 @@ npm run dev
 ## Data Models
 
 ### Users
+
 - `id`: UUID (primary key)
 - `email`: String (unique)
 - `name`: String
@@ -190,6 +198,7 @@ npm run dev
 - `created_at`: Timestamp
 
 ### Teams
+
 - `id`: UUID (primary key)
 - `name`: String
 - `owner_id`: UUID (foreign key to users)
@@ -198,6 +207,7 @@ npm run dev
 - `deleted_at`: Timestamp (nullable, soft delete)
 
 ### Team Members
+
 - `id`: UUID (primary key)
 - `team_id`: UUID (foreign key to teams)
 - `user_id`: UUID (foreign key to users)
@@ -205,6 +215,7 @@ npm run dev
 - `joined_at`: Timestamp
 
 ### Projects
+
 - `id`: UUID (primary key)
 - `team_id`: UUID (foreign key to teams)
 - `name`: String
@@ -216,6 +227,7 @@ npm run dev
 - `deleted_at`: Timestamp (nullable, soft delete)
 
 ### Issues
+
 - `id`: UUID (primary key)
 - `project_id`: UUID (foreign key to projects)
 - `title`: String
@@ -230,6 +242,7 @@ npm run dev
 - `deleted_at`: Timestamp (nullable, soft delete)
 
 ### Labels
+
 - `id`: UUID (primary key)
 - `project_id`: UUID (foreign key to projects)
 - `name`: String
@@ -237,6 +250,7 @@ npm run dev
 - `created_at`: Timestamp
 
 ### Team Activity Logs
+
 - `id`: UUID (primary key)
 - `team_id`: UUID (foreign key to teams)
 - `user_id`: UUID (foreign key to users)
@@ -247,6 +261,7 @@ npm run dev
 ## Access Control & Security
 
 ### Team-Based Access Control
+
 All resources (projects, issues) are protected through team membership verification:
 
 1. **Team Access**: Users must be team members to access team resources
@@ -256,12 +271,14 @@ All resources (projects, issues) are protected through team membership verificat
 ### Role-Based Permissions
 
 #### OWNER
+
 - All Admin permissions
 - Delete team
 - Change member roles
 - Transfer ownership
 
 #### ADMIN
+
 - All Member permissions
 - Invite members
 - Remove members
@@ -270,12 +287,14 @@ All resources (projects, issues) are protected through team membership verificat
 - Leave team
 
 #### MEMBER
+
 - View team resources
 - Create projects
 - Create/edit/delete issues
 - Leave team
 
 ### Error Responses
+
 - **404 NOT_FOUND**: User is not a team member (security through obscurity)
 - **403 FORBIDDEN**: User lacks required permissions for the action
 - **401 UNAUTHORIZED**: User is not authenticated
@@ -283,10 +302,12 @@ All resources (projects, issues) are protected through team membership verificat
 ## API Structure
 
 ### Authentication API (`/lib/api/auth.ts`)
+
 - `getCurrentUserId()`: Get current user ID from session
 - Sign in/out handled by Supabase Auth
 
 ### Teams API (`/lib/api/teams.ts`)
+
 - `getUserTeams(userId)`: Get all teams for user
 - `createTeam(name, ownerId)`: Create new team
 - `getTeamById(teamId, userId)`: Get team details
@@ -295,6 +316,7 @@ All resources (projects, issues) are protected through team membership verificat
 - `verifyTeamMembership(teamId, userId)`: Helper for access control
 
 ### Team Members API (`/lib/api/teamMembers.ts`)
+
 - `getTeamMembers(teamId, userId)`: Get all team members
 - `addMembersToTeam(teamId, userIds, inviterId)`: Invite members
 - `removeMemberFromTeam(teamId, memberId, removerId)`: Remove member
@@ -303,6 +325,7 @@ All resources (projects, issues) are protected through team membership verificat
 - `getUserRole(teamId, userId)`: Get user's role in team
 
 ### Projects API (`/lib/api/projects.ts`)
+
 - `getTeamProjects(teamId, userId)`: Get all projects for team
 - `createProject(teamId, name, description, ownerId)`: Create project
 - `getProjectById(projectId, userId)`: Get project details
@@ -311,6 +334,7 @@ All resources (projects, issues) are protected through team membership verificat
 - `toggleProjectArchive(projectId, isArchived, userId)`: Archive/unarchive
 
 ### Issues API (`/lib/api/issues.ts`)
+
 - `getProjectIssues(projectId, userId)`: Get all issues for project
 - `getIssueById(issueId, userId)`: Get issue details
 - `updateIssueStatus(issueId, status, userId)`: Update issue status
@@ -318,29 +342,36 @@ All resources (projects, issues) are protected through team membership verificat
 - `deleteIssue(issueId, userId)`: Soft delete issue
 
 ### Team Activity API (`/lib/api/teamActivity.ts`)
+
 - `getTeamActivityLogs(teamId, limit, offset)`: Get paginated activity logs
 - `logTeamActivity(teamId, userId, actionType, details)`: Create activity log
 
 ## Key Features
 
 ### Soft Delete Pattern
+
 All deletable entities (teams, projects, issues) use soft delete with `deleted_at` timestamp instead of hard delete, allowing for potential recovery and maintaining referential integrity.
 
 ### Activity Logging
+
 Team activities are automatically logged for:
+
 - Member management (add, remove, role changes)
 - Project lifecycle (create, delete, archive)
 - Team updates
 
 ### Pagination
+
 Activity logs support cursor-based pagination with configurable limit and offset.
 
 ### Real-time Updates
+
 Changes to issues (status, assignee, etc.) reflect immediately in the UI using optimistic updates and state management.
 
 ## Development
 
 ### Project Structure
+
 ```
 app/
 ├── (auth)/              # Authentication pages
@@ -367,6 +398,7 @@ lib/
 ```
 
 ### Code Conventions
+
 - Use TypeScript for type safety
 - Async/await for asynchronous operations
 - Error handling with try/catch blocks
