@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
-import { Loader2Icon, FolderOpen } from "lucide-react"
+import { FolderOpen } from "lucide-react"
 import Link from "next/link"
+import { Spinner } from "@/components/ui/spinner"
 
 export default function ProjectsRedirectPage() {
   const router = useRouter()
@@ -73,30 +74,23 @@ export default function ProjectsRedirectPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2Icon className="size-8 animate-spin text-gray-400" />
-          <p className="text-sm text-gray-500">Loading project...</p>
-        </div>
+        <Spinner size="lg" label="Loading project..." />
       </div>
     )
   }
 
   if (noProjects) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
-              <FolderOpen className="w-8 h-8 text-purple-600" />
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">No Projects Found</h1>
-          <p className="text-gray-600 mb-6">
-            You don't have any projects yet. To create a project, you need to first create or join a team, then create a project within that team.
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="text-center py-12">
+          <FolderOpen className="mx-auto size-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No projects found</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first team and project to get started
           </p>
           <Link
             href="/teams"
-            className="inline-block bg-purple-600 text-white py-2 px-6 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 rounded-md text-sm font-medium transition-colors"
           >
             Go to Teams
           </Link>

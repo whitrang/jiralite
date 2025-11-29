@@ -8,18 +8,16 @@ export interface ActivityLogWithActor extends ActivityLog {
   actor: User;
 }
 
-// Get activity logs for a team with pagination
+// Get all activity logs for a team
 export async function getTeamActivityLogs(
-  teamId: string,
-  limit: number = 20,
-  offset: number = 0
+  teamId: string
 ): Promise<ActivityLogWithActor[]> {
   try {
     const { data, error } = await supabase
       .from('team_activity_logs')
       .select(`
         *,
-        actor:users!team_activity_logs_actor_id_fkey (
+        actor:actor_id (
           id,
           name,
           email,
@@ -27,8 +25,7 @@ export async function getTeamActivityLogs(
         )
       `)
       .eq('team_id', teamId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
     return (data || []) as ActivityLogWithActor[];
@@ -72,6 +69,9 @@ export function formatActivityMessage(log: ActivityLogWithActor): string {
     case 'TEAM_UPDATED':
       return `${actorName} updated team information`;
 
+    case 'TEAM_CREATED':
+      return `${actorName} created the team`;
+
     default:
       return `${actorName} performed an action`;
   }
@@ -95,7 +95,33 @@ export function getActivityIcon(actionType: string): string {
       return 'archive';
     case 'TEAM_UPDATED':
       return 'settings';
+    case 'TEAM_CREATED':
+      return 'users';
     default:
       return 'activity';
+  }
+}
+
+// Log team activity
+export async function logTeamActivity(
+  teamId: string,
+  actorId: string,
+  actionType: string,
+  targetType?: string,
+  targetId?: string,
+  metadata?: any
+): Promise<void> {
+  try {
+    await supabase.from('team_activity_logs').insert({
+      team_id: teamId,
+      actor_id: actorId,
+      action_type: actionType,
+      target_type: targetType,
+      target_id: targetId,
+      metadata,
+    });
+  } catch (error) {
+    console.error('Error logging team activity:', error);
+    // Don't throw - activity logging is not critical
   }
 }

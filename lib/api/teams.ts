@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { Database } from '@/lib/database.types';
+import { logTeamActivity } from './activityLogs';
 
 type Team = Database['public']['Tables']['teams']['Row'];
 type TeamMember = Database['public']['Tables']['team_members']['Row'];
@@ -110,6 +111,10 @@ export async function createTeam(name: string, ownerId: string): Promise<Team> {
       .single();
 
     if (error) throw error;
+
+    // Log team creation activity
+    await logTeamActivity(data.id, ownerId, 'TEAM_CREATED', 'team', data.id);
+
     return data;
   } catch (error) {
     console.error('Error creating team:', error);

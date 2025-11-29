@@ -103,8 +103,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   // Activity logs
   const [activityLogs, setActivityLogs] = useState<ActivityLogWithActor[]>([])
-  const [activityPage, setActivityPage] = useState(0)
-  const [hasMoreActivity, setHasMoreActivity] = useState(true)
   const [isLoadingActivity, setIsLoadingActivity] = useState(false)
 
   useEffect(() => {
@@ -204,34 +202,16 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const isOwner = currentUserRole === "OWNER"
   const isAdmin = currentUserRole === "ADMIN" || isOwner
 
-  async function loadActivityLogs(reset: boolean = false) {
+  async function loadActivityLogs() {
     try {
       setIsLoadingActivity(true)
-
-      if (reset) {
-        // Reset to first page
-        const logs = await getTeamActivityLogs(teamId, 10, 0)
-        setActivityLogs(logs)
-        setActivityPage(0)
-        setHasMoreActivity(logs.length === 10)
-      } else {
-        // Load next page
-        const nextPage = activityPage + 1
-        const logs = await getTeamActivityLogs(teamId, 10, nextPage * 10)
-        setActivityLogs(prev => [...prev, ...logs])
-        setActivityPage(nextPage)
-        setHasMoreActivity(logs.length === 10)
-      }
+      const logs = await getTeamActivityLogs(teamId)
+      setActivityLogs(logs)
     } catch (err) {
       console.error("Error loading activity logs:", err)
     } finally {
       setIsLoadingActivity(false)
     }
-  }
-
-  const loadMoreActivity = async () => {
-    if (isLoadingActivity || !hasMoreActivity) return
-    await loadActivityLogs(false)
   }
 
   const getActivityIconComponent = (actionType: string) => {
@@ -253,6 +233,28 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
         return SettingsIcon
       default:
         return ActivityIcon
+    }
+  }
+
+  const getActivityIconColor = (actionType: string) => {
+    switch (actionType) {
+      case 'MEMBER_ADDED':
+        return 'text-green-600'
+      case 'MEMBER_REMOVED':
+      case 'MEMBER_LEFT':
+        return 'text-red-600'
+      case 'ROLE_CHANGED':
+        return 'text-blue-600'
+      case 'PROJECT_CREATED':
+        return 'text-purple-600'
+      case 'PROJECT_DELETED':
+        return 'text-red-600'
+      case 'PROJECT_ARCHIVED':
+        return 'text-orange-600'
+      case 'TEAM_UPDATED':
+        return 'text-gray-600'
+      default:
+        return 'text-muted-foreground'
     }
   }
 
@@ -284,8 +286,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       setIsInviteModalOpen(false)
       setSelectedUserIds([])
 
-      // Reload team data to show new members
+      // Reload members and activity logs
       await loadTeamData()
+      await loadActivityLogs()
 
       // Show success message
       setSuccessMessage(`Successfully added ${count} member${count !== 1 ? 's' : ''}!`)
@@ -343,6 +346,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
           prev.map(m => (m.id === memberId ? { ...m, role: newRole } : m))
         )
       }
+
+      // Reload activity logs to show the role change
+      await loadActivityLogs()
     } catch (err) {
       console.error("Error changing role:", err)
       alert("Failed to change role. Please try again.")
@@ -358,6 +364,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       setMembers(prev => prev.filter(m => m.id !== selectedMember.id))
       setIsRemoveModalOpen(false)
       setSelectedMember(null)
+
+      // Reload activity logs to show the removal
+      await loadActivityLogs()
     } catch (err) {
       console.error("Error removing member:", err)
       alert("Failed to remove member. Please try again.")
@@ -398,8 +407,9 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
       setNewProjectName("")
       setNewProjectDescription("")
 
-      // Reload team data to show new project
+      // Reload team data and activity logs
       await loadTeamData()
+      await loadActivityLogs()
 
       // Show success message
       setSuccessMessage("Successfully created project!")
@@ -661,13 +671,14 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
             <div className="space-y-4">
               {activityLogs.map((log) => {
                 const Icon = getActivityIconComponent(log.action_type)
+                const iconColor = getActivityIconColor(log.action_type)
                 return (
                   <div
                     key={log.id}
                     className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                   >
                     <div className="mt-0.5">
-                      <Icon className="size-4 text-muted-foreground" />
+                      <Icon className={`size-4 ${iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm">{formatActivityMessage(log)}</p>
@@ -678,19 +689,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   </div>
                 )
               })}
-
-              {hasMoreActivity && (
-                <div className="text-center pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={loadMoreActivity}
-                    disabled={isLoadingActivity}
-                  >
-                    {isLoadingActivity && <Loader2Icon className="animate-spin" />}
-                    Load More
-                  </Button>
-                </div>
-              )}
             </div>
           )}
         </CardContent>
