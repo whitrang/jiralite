@@ -601,7 +601,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   {activeProjects.map((project) => (
                     <Card
                       key={project.id}
-                      className="cursor-pointer transition-all hover:shadow-md"
+                      className="cursor-pointer transition-all hover:shadow-md border border-gray-200"
                       onClick={() => router.push(`/projects/${project.id}`)}
                     >
                       <CardHeader className="pb-3">
