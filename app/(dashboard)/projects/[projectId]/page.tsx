@@ -207,6 +207,7 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [projectLabels, setProjectLabels] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -220,14 +221,16 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
 
   // Open issue modal from URL parameter
   useEffect(() => {
-    const issueId = searchParams.get('issueId');
+    const issueId = searchParams.get('issue');
     if (issueId && tasks.length > 0 && !loading) {
       const task = tasks.find(t => t.id === issueId);
-      if (task) {
+      if (task && !isIssueDetailOpen) {
         handleCardClick(task);
-        // Remove issueId from URL after opening modal
-        router.replace('/projects', { scroll: false });
       }
+    } else if (!issueId && isIssueDetailOpen) {
+      // Close modal if URL param is removed
+      setIsIssueDetailOpen(false);
+      setSelectedIssue(null);
     }
   }, [searchParams, tasks, loading]);
 
@@ -250,17 +253,16 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
 
       if (userData) {
         setCurrentUser(userData);
+        // Load specific project and its issues with user data
+        await loadProjectData(projectId, userData);
       }
-
-      // Load specific project and its issues
-      await loadProjectData(projectId);
     } catch (error) {
       console.error("Error loading data:", error);
       setLoading(false);
     }
   };
 
-  const loadProjectData = async (projectId: string) => {
+  const loadProjectData = async (projectId: string, userData?: any) => {
     try {
       // Get project details
       const project = await getProjectById(projectId);
@@ -271,6 +273,33 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       }
 
       setCurrentProject(project);
+
+      // Load all projects from all teams the user belongs to
+      const user = userData || currentUser;
+      if (user) {
+        // Get all teams the user is a member of
+        const { data: teamMembers } = await supabase
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", user.id);
+
+        if (teamMembers && teamMembers.length > 0) {
+          const teamIds = teamMembers.map(tm => tm.team_id);
+
+          // Get all projects from these teams
+          const { data: projects } = await supabase
+            .from("projects")
+            .select("id, name, team_id, teams!inner(name)")
+            .in("team_id", teamIds)
+            .eq("is_archived", false)
+            .is("deleted_at", null)
+            .order("name", { ascending: true });
+
+          if (projects) {
+            setAllProjects(projects);
+          }
+        }
+      }
 
       // Load issues for this project
       await loadProjectIssues(projectId);
@@ -667,6 +696,11 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
   };
 
   const handleCardClick = async (task: Task) => {
+    // Update URL with issue parameter
+    const url = new URL(window.location.href);
+    url.searchParams.set('issue', task.id);
+    router.push(url.pathname + url.search, { scroll: false });
+
     // Fetch full issue details from database
     const { data: issue, error } = await supabase
       .from("issues")
@@ -768,6 +802,11 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       .eq("id", selectedIssue.id);
 
     if (!error) {
+      // Remove issue parameter from URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('issue');
+      router.push(url.pathname + url.search, { scroll: false });
+
       setIsIssueDetailOpen(false);
       setSelectedIssue(null);
 
@@ -880,8 +919,30 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
             Project / {currentProject?.name || "Loading..."} / Board
           </div>
 
-          {/* Project Title */}
-          <h1 className="text-4xl font-bold mb-6">{currentProject?.name || "Project Board"}</h1>
+          {/* Project Title and Selector */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col items-center gap-4">
+              <h1 className="text-4xl font-bold">{currentProject?.name || "Project Board"}</h1>
+              {allProjects.length > 1 && currentProject && (
+                <Select
+                  value={projectId}
+                  onValueChange={(value) => router.push(`/projects/${value}`)}
+                >
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Switch project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allProjects.map((project: any) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                        {project.teams && ` • ${project.teams.name}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
 
           {/* Filter and Sort Actions */}
           <div className="flex items-center justify-end">
@@ -1183,7 +1244,19 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       </Dialog>
 
       {/* Issue Detail Dialog */}
-      <Dialog open={isIssueDetailOpen} onOpenChange={setIsIssueDetailOpen}>
+      <Dialog
+        open={isIssueDetailOpen}
+        onOpenChange={(open) => {
+          setIsIssueDetailOpen(open);
+          if (!open) {
+            // Remove issue parameter from URL when closing
+            const url = new URL(window.location.href);
+            url.searchParams.delete('issue');
+            router.push(url.pathname + url.search, { scroll: false });
+            setSelectedIssue(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-[90vw] w-[800px] max-h-[95vh] overflow-y-auto">
           {selectedIssue && (
             <>
