@@ -118,9 +118,31 @@ export async function inviteMember(
 export async function updateMemberRole(
   teamId: string,
   userId: string,
-  newRole: 'OWNER' | 'ADMIN' | 'MEMBER'
+  newRole: 'OWNER' | 'ADMIN' | 'MEMBER',
+  currentUserId?: string
 ): Promise<void> {
   try {
+    // If transferring OWNER role, demote current OWNER to ADMIN
+    if (newRole === 'OWNER' && currentUserId) {
+      // First, demote current OWNER to ADMIN
+      const { error: demoteError } = await supabase
+        .from('team_members')
+        .update({ role: 'ADMIN' })
+        .eq('team_id', teamId)
+        .eq('user_id', currentUserId);
+
+      if (demoteError) throw demoteError;
+
+      // Update team owner_id
+      const { error: teamError } = await supabase
+        .from('teams')
+        .update({ owner_id: userId })
+        .eq('id', teamId);
+
+      if (teamError) throw teamError;
+    }
+
+    // Update the target user's role
     const { error } = await supabase
       .from('team_members')
       .update({ role: newRole })

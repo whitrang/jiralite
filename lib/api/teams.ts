@@ -112,15 +112,32 @@ export async function updateTeam(teamId: string, name: string): Promise<Team> {
   }
 }
 
-// Delete a team (soft delete)
-export async function deleteTeam(teamId: string): Promise<void> {
+// Delete a team (soft delete) - Only OWNER can delete
+export async function deleteTeam(teamId: string, userId: string): Promise<void> {
   try {
+    // Check if user is the owner
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('owner_id')
+      .eq('id', teamId)
+      .single();
+
+    if (teamError) throw teamError;
+
+    if (team.owner_id !== userId) {
+      throw new Error('Only team owner can delete the team');
+    }
+
+    // Soft delete the team
     const { error } = await supabase
       .from('teams')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', teamId);
 
     if (error) throw error;
+
+    // Note: Cascade delete of projects, issues, etc. should be handled by database triggers
+    // or you can manually soft delete them here
   } catch (error) {
     console.error('Error deleting team:', error);
     throw error;

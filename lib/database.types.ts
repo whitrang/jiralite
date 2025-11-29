@@ -250,6 +250,38 @@ export interface Database {
           deleted_at?: string | null;
         };
       };
+      team_activity_logs: {
+        Row: {
+          id: string;
+          team_id: string;
+          actor_id: string;
+          action_type: string;
+          target_type: string | null;
+          target_id: string | null;
+          metadata: any;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          team_id: string;
+          actor_id: string;
+          action_type: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          metadata?: any;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          team_id?: string;
+          actor_id?: string;
+          action_type?: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          metadata?: any;
+          created_at?: string;
+        };
+      };
     };
   };
 }

@@ -19,13 +19,20 @@ import {
   UserMinusIcon,
   StarIcon,
   ClockIcon,
-  CheckCircle2Icon
+  CheckCircle2Icon,
+  ActivityIcon,
+  UserIcon,
+  ShieldIcon,
+  FolderPlusIcon,
+  FolderMinusIcon,
+  ArchiveIcon
 } from "lucide-react"
 import { getTeamById } from "@/lib/api/teams"
 import { getTeamMembers, getUserRole, addMembersToTeam, updateMemberRole, removeMember } from "@/lib/api/teamMembers"
 import { getCurrentUserId } from "@/lib/api/auth"
 import { getAllUsers } from "@/lib/api/users"
 import { createProject } from "@/lib/api/projects"
+import { getTeamActivityLogs, formatActivityMessage, type ActivityLogWithActor } from "@/lib/api/activityLogs"
 import { supabase } from "@/lib/supabaseClient"
 
 type TeamRole = "OWNER" | "ADMIN" | "MEMBER"
@@ -94,8 +101,15 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const [newProjectDescription, setNewProjectDescription] = useState("")
   const [isCreatingProject, setIsCreatingProject] = useState(false)
 
+  // Activity logs
+  const [activityLogs, setActivityLogs] = useState<ActivityLogWithActor[]>([])
+  const [activityPage, setActivityPage] = useState(0)
+  const [hasMoreActivity, setHasMoreActivity] = useState(true)
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false)
+
   useEffect(() => {
     loadTeamData()
+    loadActivityLogs()
   }, [teamId])
 
   async function loadTeamData() {
@@ -190,6 +204,67 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const isOwner = currentUserRole === "OWNER"
   const isAdmin = currentUserRole === "ADMIN" || isOwner
 
+  async function loadActivityLogs(reset: boolean = false) {
+    try {
+      setIsLoadingActivity(true)
+      const page = reset ? 0 : activityPage
+      const logs = await getTeamActivityLogs(teamId, 10, page * 10)
+
+      if (reset) {
+        setActivityLogs(logs)
+        setActivityPage(0)
+      } else {
+        setActivityLogs(prev => [...prev, ...logs])
+      }
+
+      setHasMoreActivity(logs.length === 10)
+    } catch (err) {
+      console.error("Error loading activity logs:", err)
+    } finally {
+      setIsLoadingActivity(false)
+    }
+  }
+
+  const loadMoreActivity = async () => {
+    if (isLoadingActivity || !hasMoreActivity) return
+
+    try {
+      setIsLoadingActivity(true)
+      const nextPage = activityPage + 1
+      const logs = await getTeamActivityLogs(teamId, 10, nextPage * 10)
+
+      setActivityLogs(prev => [...prev, ...logs])
+      setActivityPage(nextPage)
+      setHasMoreActivity(logs.length === 10)
+    } catch (err) {
+      console.error("Error loading more activity logs:", err)
+    } finally {
+      setIsLoadingActivity(false)
+    }
+  }
+
+  const getActivityIconComponent = (actionType: string) => {
+    switch (actionType) {
+      case 'MEMBER_ADDED':
+        return UserPlusIcon
+      case 'MEMBER_REMOVED':
+      case 'MEMBER_LEFT':
+        return UserMinusIcon
+      case 'ROLE_CHANGED':
+        return ShieldIcon
+      case 'PROJECT_CREATED':
+        return FolderPlusIcon
+      case 'PROJECT_DELETED':
+        return FolderMinusIcon
+      case 'PROJECT_ARCHIVED':
+        return ArchiveIcon
+      case 'TEAM_UPDATED':
+        return SettingsIcon
+      default:
+        return ActivityIcon
+    }
+  }
+
   const loadAllUsers = async () => {
     try {
       setIsLoadingUsers(true)
@@ -252,10 +327,31 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
 
   const handleChangeRole = async (memberId: string, userId: string, newRole: TeamRole) => {
     try {
-      await updateMemberRole(teamId, userId, newRole)
-      setMembers(prev =>
-        prev.map(m => (m.id === memberId ? { ...m, role: newRole } : m))
-      )
+      // If transferring OWNER role, show confirmation
+      if (newRole === "OWNER" && isOwner) {
+        const confirmed = confirm(
+          "Are you sure you want to transfer OWNER role? You will become an ADMIN."
+        )
+        if (!confirmed) return
+      }
+
+      await updateMemberRole(teamId, userId, newRole, currentUserId || undefined)
+
+      // If transferred OWNER role, update current user's role in state
+      if (newRole === "OWNER" && currentUserId) {
+        setCurrentUserRole("ADMIN")
+        setMembers(prev =>
+          prev.map(m => {
+            if (m.id === memberId) return { ...m, role: newRole }
+            if (m.userId === currentUserId) return { ...m, role: "ADMIN" }
+            return m
+          })
+        )
+      } else {
+        setMembers(prev =>
+          prev.map(m => (m.id === memberId ? { ...m, role: newRole } : m))
+        )
+      }
     } catch (err) {
       console.error("Error changing role:", err)
       alert("Failed to change role. Please try again.")
@@ -288,8 +384,14 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
   const canRemoveMember = (member: DisplayMember) => {
     if (member.userId === currentUserId) return false
     if (member.role === "OWNER") return false
-    if (!isAdmin) return false
-    return true
+
+    // OWNER can remove anyone (except OWNER)
+    if (isOwner) return true
+
+    // ADMIN can only remove MEMBER (not other ADMINs)
+    if (currentUserRole === "ADMIN" && member.role === "MEMBER") return true
+
+    return false
   }
 
   const handleCreateProject = async () => {
@@ -546,6 +648,62 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
           </Card>
         </div>
       </div>
+
+      {/* Activity Log Section */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ActivityIcon className="size-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>
+            Team activity log and history
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activityLogs.length === 0 && !isLoadingActivity ? (
+            <div className="text-center py-8">
+              <ActivityIcon className="mx-auto size-12 text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground">No activity yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {activityLogs.map((log) => {
+                const Icon = getActivityIconComponent(log.action_type)
+                return (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="mt-0.5">
+                      <Icon className="size-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm">{formatActivityMessage(log)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(log.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {hasMoreActivity && (
+                <div className="text-center pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={loadMoreActivity}
+                    disabled={isLoadingActivity}
+                  >
+                    {isLoadingActivity && <Loader2Icon className="animate-spin" />}
+                    Load More
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Invite Member Modal */}
       <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
