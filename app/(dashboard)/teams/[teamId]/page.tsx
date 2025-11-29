@@ -225,21 +225,10 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
     }
   }
 
-  const loadMoreActivity = async () => {
-    if (isLoadingActivity || !hasMoreActivity) return
-
-    try {
-      setIsLoadingActivity(true)
-      const nextPage = activityPage + 1
-      const logs = await getTeamActivityLogs(teamId, 10, nextPage * 10)
-
-      setActivityLogs(prev => [...prev, ...logs])
-      setActivityPage(nextPage)
-      setHasMoreActivity(logs.length === 10)
-    } catch (err) {
-      console.error("Error loading more activity logs:", err)
-    } finally {
-      setIsLoadingActivity(false)
+  const loadMoreActivity = () => {
+    if (!isLoadingActivity && hasMoreActivity) {
+      setActivityPage(prev => prev + 1)
+      loadActivityLogs()
     }
   }
 
@@ -601,7 +590,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                     <Card
                       key={project.id}
                       className="cursor-pointer transition-all hover:shadow-md"
-                      onClick={() => router.push(`/teams/${teamId}/projects/${project.id}`)}
+                      onClick={() => router.push(`/projects/${project.id}`)}
                     >
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
