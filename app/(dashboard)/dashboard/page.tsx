@@ -256,49 +256,62 @@ export default function DashboardPage() {
   if (!isMounted) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
+        {/* Header Skeleton */}
         <div className="bg-white border-b border-gray-200 px-8 py-6">
-          <div className="text-sm text-gray-500 mb-2">Project / Mobile App / Board</div>
-          <h1 className="text-4xl font-bold mb-6">Mobile App</h1>
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-48 mb-2"></div>
+            <div className="h-10 bg-gray-200 rounded w-80 mb-6"></div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center justify-between">
-            <nav className="flex gap-8 border-b border-gray-200">
-              <button className="pb-3 text-gray-500 hover:text-gray-900">Overview</button>
-              <button className="pb-3 text-gray-900 border-b-2 border-gray-900 font-medium">Boards</button>
-              <button className="pb-3 text-gray-500 hover:text-gray-900">Timeline</button>
-              <button className="pb-3 text-gray-500 hover:text-gray-900">Activities</button>
-              <button className="pb-3 text-gray-500 hover:text-gray-900">Files</button>
-            </nav>
+            {/* Navigation Tabs Skeleton */}
+            <div className="flex items-center justify-between">
+              <div className="flex gap-8 border-b border-gray-200">
+                <div className="pb-3 h-6 bg-gray-200 rounded w-20"></div>
+                <div className="pb-3 h-6 bg-gray-200 rounded w-16"></div>
+                <div className="pb-3 h-6 bg-gray-200 rounded w-20"></div>
+                <div className="pb-3 h-6 bg-gray-200 rounded w-20"></div>
+                <div className="pb-3 h-6 bg-gray-200 rounded w-12"></div>
+              </div>
 
-            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                <Filter className="w-4 h-4" />
-                <span>Filter</span>
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                <List className="w-4 h-4" />
-                <span>Sort</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="h-9 bg-gray-200 rounded-lg w-20"></div>
+                <div className="h-9 bg-gray-200 rounded-lg w-16"></div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Kanban Board - Loading State */}
+        {/* Kanban Board Skeleton */}
         <div className="p-8">
           <div className="flex gap-6 overflow-x-auto">
-            <div className="flex-shrink-0 w-[340px] animate-pulse">
-              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
-              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
-            </div>
-            <div className="flex-shrink-0 w-[340px] animate-pulse">
-              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
-              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
-            </div>
-            <div className="flex-shrink-0 w-[340px] animate-pulse">
-              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
-              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
-            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex-shrink-0 w-[340px]">
+                <div className="animate-pulse">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-7 bg-gray-200 rounded w-24"></div>
+                    <div className="h-6 w-8 bg-gray-200 rounded-full"></div>
+                  </div>
+                  <div className="space-y-4">
+                    {[1, 2].map((j) => (
+                      <div key={j} className="bg-white rounded-xl p-4 border border-gray-200">
+                        <div className="h-4 bg-gray-200 rounded w-20 mb-3"></div>
+                        <div className="h-5 bg-gray-200 rounded w-full mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-4/5 mb-4"></div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex -space-x-2">
+                            <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                            <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="h-4 bg-gray-200 rounded w-8"></div>
+                            <div className="h-4 bg-gray-200 rounded w-8"></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -362,8 +375,8 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-8 py-6">
-          <div className="text-sm text-gray-500 mb-2">Project / Mobile App / Board</div>
-          <h1 className="text-4xl font-bold mb-6">Mobile App</h1>
+          <div className="text-sm text-gray-500 mb-2">Project / Litmers / Board</div>
+          <h1 className="text-4xl font-bold mb-6">Litmers AI Issue Tracker</h1>
 
           {/* Navigation Tabs */}
           <div className="flex items-center justify-between">
