@@ -753,7 +753,7 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
       // Reset label recommendations (they need project context)
       setRecommendedLabels([]);
 
-      // Load comments for this issue
+      // Load comments for this issue (will also load cached summary if available)
       loadComments(issue.id);
     }
   };
@@ -771,6 +771,19 @@ export default function ProjectsPage({ params }: { params: Promise<{ projectId: 
 
     if (!error && commentsData) {
       setComments(commentsData);
+
+      // Load cached comment summary if available
+      if (commentsData.length > 0) {
+        const lastCommentTime = commentsData[commentsData.length - 1].created_at;
+        const cachedSummary = getCachedCommentSummary(issueId, lastCommentTime);
+        if (cachedSummary) {
+          setCommentSummary(cachedSummary);
+        } else {
+          setCommentSummary("");
+        }
+      } else {
+        setCommentSummary("");
+      }
     }
   };
 

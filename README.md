@@ -109,30 +109,12 @@ npm run dev
     - Role changes
     - Project creation/deletion
     - Team updates
-  - Navigation to team settings
 - **Access**: Team members only
 - **Permissions**:
   - View: All members
   - Invite/Remove members: Owner, Admin
   - Change roles: Owner only
   - Create projects: All members
-
-#### Team Settings (`/teams/[teamId]/settings`)
-
-- **Location**: `app/(dashboard)/teams/[teamId]/settings/page.tsx`
-- **Features**:
-  - Team information display
-  - Edit team name (Owner/Admin only)
-  - Team statistics (created date, member count, project count)
-  - Danger zone:
-    - Leave team (Admin/Member only)
-    - Delete team (Owner only with confirmation)
-- **Access**: Team members only
-- **Permissions**:
-  - View: All members
-  - Edit team name: Owner, Admin
-  - Leave team: Admin, Member
-  - Delete team: Owner only
 
 #### Projects Redirect (`/projects`)
 
@@ -151,19 +133,12 @@ npm run dev
   - Kanban board with drag-and-drop functionality
   - Issue columns: Backlog, Todo, In Progress, Done
   - Project switcher: Quickly switch between all projects you have access to across all teams
-  - Create new issues with:
-    - Title and description
-    - Priority (Low/Medium/High)
-    - Assignee selection
-    - Label assignment
   - Issue management:
     - Drag between columns to update status
-    - Click to view/edit issue details
+    - Click to view/edit issue details in modal
+    - Edit title, description, status, priority, assignee, labels
+    - Add and view comments
     - Delete issues
-    - Update assignee, priority, title, description
-  - Label management:
-    - Create custom labels with colors
-    - Assign multiple labels per issue
   - Real-time issue filtering and sorting
   - **AI-Powered Features** (in issue detail modal):
     - **AI Advice**: Get AI-generated todo lists and time estimates for completing the task
@@ -173,7 +148,7 @@ npm run dev
 - **Access**: Team members only (via project's team)
 - **Permissions**:
   - View issues: All team members
-  - Create/Edit/Delete issues: All team members
+  - Edit/Delete issues: All team members
   - Manage labels: All team members
   - Use AI features: All team members (subject to rate limits)
 
@@ -352,10 +327,32 @@ All resources (projects, issues) are protected through team membership verificat
 - `updateIssueField(issueId, field, value, userId)`: Update any issue field
 - `deleteIssue(issueId, userId)`: Soft delete issue
 
-### Team Activity API (`/lib/api/teamActivity.ts`)
+### Team Activity API (`/lib/api/activityLogs.ts`)
 
 - `getTeamActivityLogs(teamId, limit, offset)`: Get paginated activity logs
-- `logTeamActivity(teamId, userId, actionType, details)`: Create activity log
+- `formatActivityMessage(log)`: Format activity log message
+- `getActivityIcon(actionType)`: Get icon for activity type
+
+### AI API (`/lib/api/gpt.ts`)
+
+- `askGPT(prompt, systemPrompt, options, userId)`: Send request to OpenAI API with rate limiting
+
+### AI Caching API (`/lib/api/aiCache.ts`)
+
+- `getCachedAiAdvice(issueId, timestamp)`: Get cached AI advice
+- `setCachedAiAdvice(issueId, advice, timestamp)`: Cache AI advice
+- `getCachedLabelRecommendations(issueId, timestamp)`: Get cached label recommendations
+- `setCachedLabelRecommendations(issueId, recommendations, timestamp)`: Cache label recommendations
+- `getCachedCommentSummary(issueId, timestamp)`: Get cached comment summary
+- `setCachedCommentSummary(issueId, summary, timestamp)`: Cache comment summary
+- `invalidateCommentSummaryCache(issueId)`: Invalidate comment summary cache
+- `invalidateAllAiCaches(issueId)`: Invalidate all AI caches for an issue
+- `validateDescriptionForAI(description)`: Validate description length for AI features
+
+### AI Rate Limiting API (`/lib/api/aiRateLimit.ts`)
+
+- `checkRateLimit(userId, action)`: Check if user has exceeded rate limits
+- `incrementRateLimit(userId, action)`: Increment rate limit counter
 
 ## Key Features
 
@@ -369,7 +366,7 @@ This includes:
 - Teams and team memberships
 - Projects and issues
 - Comments and activity logs
-- Labels and notifications
+- Labels
 
 All CRUD operations are handled through Supabase queries with proper access control and validation.
 
@@ -429,6 +426,26 @@ lib/
 - Error handling with try/catch blocks
 - Access control verification in all API functions
 - Soft delete pattern for data persistence
+
+## AI Features
+
+The issue detail modal includes three AI-powered features:
+
+1. **AI Advice** - Generates todo lists and time estimates for completing the task
+2. **AI Label Recommendations** - Suggests relevant labels based on issue content (up to 3 labels)
+3. **Comment Summarization** - Summarizes comment threads (requires 5+ comments)
+
+All AI features include smart caching and rate limiting (30/min, 100/day per user).
+
+## Known Limitations
+
+### Authentication
+
+**Required Feature**: Email/Password + Google OAuth
+
+**Current Implementation**: Email/Password authentication only
+
+**Note**: Test accounts are provided on the login page (Owner, Admin, Member roles) for easy demonstration.
 
 ## License
 
