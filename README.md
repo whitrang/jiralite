@@ -357,6 +357,7 @@ All resources (projects, issues) are protected through team membership verificat
 **All data in this application is fully integrated with a live Supabase database** – there are no mock data or placeholder values. Every feature, from user authentication to issue tracking, reads from and writes to actual database tables with proper relationships, constraints, and indexes.
 
 This includes:
+
 - User accounts and authentication
 - Teams and team memberships
 - Projects and issues
@@ -421,34 +422,6 @@ lib/
 - Error handling with try/catch blocks
 - Access control verification in all API functions
 - Soft delete pattern for data persistence
-
-## Known Limitations & Future Plans
-
-### Authentication
-
-**Required Feature**: Email/Password + Google OAuth
-
-**Current Implementation**: Email/Password authentication only
-
-**Workaround**: To ensure easy testing and demonstration, we provide pre-configured test accounts directly on the login page with different roles (Owner, Admin, Member). Users can instantly test the application without going through the full registration process.
-
-### AI Features
-
-**Required Feature**: AI-powered functionalities
-
-**Status**: Not implemented due to time constraints
-
-**Planned Features** (if we had more time):
-
-1. **AI Auto-Categorization** – Automatically assigns labels, priority, and status based on the issue title and description.
-
-2. **Natural Language Issue Creation** – Users can create issues by typing commands like "Create a bug for the login error," and AI fills in all fields.
-
-3. **AI Summaries** – Generates short summaries or TL;DR for long issue descriptions or comment threads.
-
-4. **Duplicate Issue Detection** – Detects and suggests existing similar issues using semantic search and embeddings.
-
-5. **Sprint & Backlog Insights** – Analyzes all issues to produce automated reports, highlight bottlenecks, and suggest next priorities.
 
 ## License
 

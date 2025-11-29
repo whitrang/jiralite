@@ -161,7 +161,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col py-6 px-3">
+      <aside className="w-56 h-screen sticky top-0 bg-white border-r border-gray-200 flex flex-col py-6 px-3">
         <nav className="flex flex-col gap-1 flex-1">
           {menuItems.map((item) => {
             const Icon = item.icon;

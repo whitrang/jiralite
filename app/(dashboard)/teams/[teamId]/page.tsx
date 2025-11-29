@@ -561,6 +561,18 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   </div>
                 ))}
               </div>
+              {isAdmin && (
+                <div className="mt-4 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleOpenInviteModal}
+                  >
+                    <UserPlusIcon className="size-4 mr-2" />
+                    Add Team Member
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -601,7 +613,7 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                   {activeProjects.map((project) => (
                     <Card
                       key={project.id}
-                      className="cursor-pointer transition-all hover:shadow-md border border-gray-200"
+                      className="cursor-pointer transition-all shadow-sm hover:shadow-md border border-border"
                       onClick={() => router.push(`/projects/${project.id}`)}
                     >
                       <CardHeader className="pb-3">
@@ -635,15 +647,6 @@ export default function TeamDashboardPage({ params }: { params: Promise<{ teamId
                     </Card>
                   ))}
                 </div>
-              )}
-              {activeProjects.length > 0 && (
-                <Button
-                  className="w-full mt-4"
-                  variant="outline"
-                  onClick={() => router.push(`/teams/${teamId}/projects`)}
-                >
-                  View All Projects
-                </Button>
               )}
             </CardContent>
           </Card>

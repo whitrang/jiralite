@@ -181,16 +181,23 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => fillTestAccount("john@vietvibe.com", "1q1q1q1q")}
-            className="w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200"
+            className="w-full text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border-2 border-blue-400"
           >
-            <div className="flex justify-between items-center">
-              <div>
-                <p className="text-sm font-medium text-gray-900">john@vietvibe.com</p>
-                <p className="text-xs text-gray-600">Password: 1q1q1q1q</p>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">john@vietvibe.com</p>
+                  <p className="text-xs text-gray-600">Password: 1q1q1q1q</p>
+                </div>
+                <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                  Owner
+                </span>
               </div>
-              <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                Owner
-              </span>
+              <div className="bg-blue-100 border border-blue-300 rounded px-2 py-1.5">
+                <p className="text-xs font-semibold text-blue-800">
+                  ⭐ Use this OWNER account to access all features!
+                </p>
+              </div>
             </div>
           </button>
 
