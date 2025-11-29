@@ -17,7 +17,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "@/lib/supabaseClient";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -158,8 +158,16 @@ interface FilterState {
 
 type SortOption = "created_at" | "due_date" | "priority" | "updated_at";
 
+// Helper function to generate consistent avatar based on name
+const getAvatarUrl = (name: string, fallbackImage?: string | null) => {
+  if (fallbackImage) return fallbackImage;
+  // UI Avatars generates consistent avatars based on name
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=150&bold=true`;
+};
+
 export default function ProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,6 +196,7 @@ export default function ProjectsPage() {
   const [editedDescription, setEditedDescription] = useState("");
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [projectLabels, setProjectLabels] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -206,6 +215,19 @@ export default function ProjectsPage() {
     applyFiltersAndSort();
   }, [tasks, filters, sortBy]);
 
+  // Open issue modal from URL parameter
+  useEffect(() => {
+    const issueId = searchParams.get('issueId');
+    if (issueId && tasks.length > 0 && !loading) {
+      const task = tasks.find(t => t.id === issueId);
+      if (task) {
+        handleCardClick(task);
+        // Remove issueId from URL after opening modal
+        router.replace('/projects', { scroll: false });
+      }
+    }
+  }, [searchParams, tasks, loading]);
+
   const checkAuthAndLoadData = async () => {
     try {
       // Check if user is logged in
@@ -214,6 +236,17 @@ export default function ProjectsPage() {
       if (!session) {
         router.push("/login");
         return;
+      }
+
+      // Load current user profile
+      const { data: userData } = await supabase
+        .from("users")
+        .select("id, name, profile_image")
+        .eq("id", session.user.id)
+        .single();
+
+      if (userData) {
+        setCurrentUser(userData);
       }
 
       // Load user's first project and its issues
@@ -469,7 +502,7 @@ export default function ProjectsPage() {
         // Get assignee
         const assignees = issue.assignee ? [{
           name: issue.assignee.name,
-          avatar: issue.assignee.profile_image || `https://i.pravatar.cc/150?u=${issue.assignee.id}`,
+          avatar: getAvatarUrl(issue.assignee.name, issue.assignee.profile_image),
         }] : [];
 
         return {
@@ -1236,7 +1269,7 @@ export default function ProjectsPage() {
                       <span className="font-medium">Created by</span>
                       <div className="flex items-center gap-2">
                         <img
-                          src={selectedIssue.creator.profile_image || `https://i.pravatar.cc/150?u=${selectedIssue.creator.id}`}
+                          src={getAvatarUrl(selectedIssue.creator.name, selectedIssue.creator.profile_image)}
                           alt={selectedIssue.creator.name}
                           className="w-6 h-6 rounded-full"
                         />
@@ -1310,7 +1343,7 @@ export default function ProjectsPage() {
                       <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                         <div className="flex items-center gap-2">
                           <img
-                            src={selectedIssue.assignee.profile_image || `https://i.pravatar.cc/150?u=${selectedIssue.assignee.id}`}
+                            src={getAvatarUrl(selectedIssue.assignee.name, selectedIssue.assignee.profile_image)}
                             alt={selectedIssue.assignee.name}
                             className="w-8 h-8 rounded-full"
                           />
@@ -1467,25 +1500,36 @@ export default function ProjectsPage() {
                 {/* Comments Section */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Comments
+                    Comments ({comments.length})
                   </label>
 
                   {/* Comment Input */}
                   <div className="mb-4">
                     <div className="flex gap-3">
                       <img
-                        src="https://i.pravatar.cc/150?u=current-user"
-                        alt="You"
+                        src={currentUser ? getAvatarUrl(currentUser.name, currentUser.profile_image) : "https://ui-avatars.com/api/?name=User&background=random&color=fff&size=150&bold=true"}
+                        alt={currentUser?.name || "You"}
                         className="w-8 h-8 rounded-full flex-shrink-0"
                       />
                       <div className="flex-1">
                         <textarea
                           placeholder="Add a comment..."
+                          value={newComment}
+                          onChange={(e) => setNewComment(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                              handlePostComment();
+                            }
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                           rows={3}
                         />
                         <div className="flex justify-end mt-2">
-                          <Button size="sm">
+                          <Button 
+                            size="sm" 
+                            onClick={handlePostComment}
+                            disabled={!newComment.trim()}
+                          >
                             <Send className="w-4 h-4 mr-2" />
                             Post Comment
                           </Button>
@@ -1496,9 +1540,38 @@ export default function ProjectsPage() {
 
                   {/* Comments List */}
                   <div className="space-y-4">
-                    <div className="text-sm text-gray-500 text-center py-4">
-                      No comments yet. Be the first to comment!
-                    </div>
+                    {comments.length > 0 ? (
+                      comments.map((comment: any) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <img
+                            src={getAvatarUrl(comment.user.name, comment.user.profile_image)}
+                            alt={comment.user.name}
+                            className="w-8 h-8 rounded-full flex-shrink-0"
+                          />
+                          <div className="flex-1">
+                            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-sm">{comment.user.name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {new Date(comment.created_at).toLocaleString("ko-KR", {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-sm text-gray-500 text-center py-4">
+                        No comments yet. Be the first to comment!
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

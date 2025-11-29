@@ -314,7 +314,11 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold mb-4">Recent Issues</h3>
               <div className="space-y-3">
                 {recentTasks.map((task) => (
-                  <div key={task.id} className="pb-3 border-b border-gray-100 last:border-b-0">
+                  <div 
+                    key={task.id} 
+                    className="pb-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 px-2 py-1 -mx-2 -my-1 mb-2 rounded cursor-pointer transition-colors"
+                    onClick={() => router.push(`/projects?issueId=${task.id}`)}
+                  >
                     <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-2 py-0.5 rounded ${
@@ -344,7 +348,11 @@ export default function Dashboard() {
                     ? Math.ceil((task.dueDate.getTime() - now) / (24 * 60 * 60 * 1000))
                     : 0;
                   return (
-                    <div key={task.id} className="p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors">
+                    <div 
+                      key={task.id} 
+                      className="p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => router.push(`/projects?issueId=${task.id}`)}
+                    >
                       <p className="font-medium text-gray-900 truncate mb-2">{task.title}</p>
                       <div className="flex items-center justify-between">
                         <span className={`text-xs px-2 py-1 rounded ${
