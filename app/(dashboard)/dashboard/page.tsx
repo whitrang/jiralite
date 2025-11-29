@@ -2,7 +2,7 @@
 
 import { KanbanCard } from "@/components/ui/kanban-card";
 import { Filter, List, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -11,6 +11,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
@@ -36,6 +37,19 @@ const INITIAL_TASKS: Task[] = [
   {
     id: "task-1",
     status: "todo",
+    badges: [{ label: "Design System", variant: "warning" }],
+    title: "Carnesia Mobile App",
+    description: "One-stop authentic shop for Beauty, Makeup, Skin Care & Accessories",
+    assignees: [
+      { name: "User 4", avatar: "https://i.pravatar.cc/150?img=4" }
+    ],
+    attachments: 2,
+    comments: 19
+  },
+
+  {
+    id: "task-2",
+    status: "todo",
     image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop",
     badges: [
       { label: "High", variant: "default" },
@@ -46,22 +60,10 @@ const INITIAL_TASKS: Task[] = [
     assignees: [
       { name: "User 1", avatar: "https://i.pravatar.cc/150?img=1" },
       { name: "User 2", avatar: "https://i.pravatar.cc/150?img=2" },
-      { name: "User 3", avatar: "https://i.pravatar.cc/150?img=3" }
+      { name: "User 3", avatar: "https://i.prava2tar.cc/150?img=3" }
     ],
     attachments: 1,
     comments: 10
-  },
-  {
-    id: "task-2",
-    status: "todo",
-    badges: [{ label: "Design System", variant: "warning" }],
-    title: "Carnesia Mobile App",
-    description: "One-stop authentic shop for Beauty, Makeup, Skin Care & Accessories",
-    assignees: [
-      { name: "User 4", avatar: "https://i.pravatar.cc/150?img=4" }
-    ],
-    attachments: 2,
-    comments: 19
   },
   {
     id: "task-3",
@@ -135,7 +137,7 @@ const INITIAL_TASKS: Task[] = [
   }
 ];
 
-function SortableCard({ task }: { task: Task }) {
+function SortableCard({ task, isOverlay = false }: { task: Task; isOverlay?: boolean }) {
   const {
     attributes,
     listeners,
@@ -143,6 +145,7 @@ function SortableCard({ task }: { task: Task }) {
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({ id: task.id });
 
   const style = {
@@ -151,17 +154,84 @@ function SortableCard({ task }: { task: Task }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  if (isOverlay) {
+    return (
+      <div>
+        <KanbanCard
+          image={task.image}
+          badges={task.badges}
+          title={task.title}
+          description={task.description}
+          assignees={task.assignees}
+          attachments={task.attachments}
+          comments={task.comments}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <KanbanCard
-        image={task.image}
-        badges={task.badges}
-        title={task.title}
-        description={task.description}
-        assignees={task.assignees}
-        attachments={task.attachments}
-        comments={task.comments}
-      />
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative">
+      {isOver && (
+        <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-400 rounded-full z-10 animate-pulse" />
+      )}
+      <div className={`transition-all duration-200 ${isOver ? 'mt-8' : 'mt-0'}`}>
+        <KanbanCard
+          image={task.image}
+          badges={task.badges}
+          title={task.title}
+          description={task.description}
+          assignees={task.assignees}
+          attachments={task.attachments}
+          comments={task.comments}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DroppableColumn({
+  id,
+  children,
+  title,
+  count,
+  badgeColor,
+  isEmpty,
+}: {
+  id: string;
+  children: React.ReactNode;
+  title: string;
+  count: number;
+  badgeColor: string;
+  isEmpty: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  return (
+    <div ref={setNodeRef} className="flex-shrink-0 w-[340px]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="font-semibold text-lg">{title}</h2>
+          <span className={`${badgeColor} text-white text-xs font-medium px-2.5 py-0.5 rounded-full`}>
+            {count}
+          </span>
+        </div>
+        <button className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg">
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className={`min-h-[200px] p-3 rounded-lg border-2 transition-all duration-200 ${isOver && isEmpty
+          ? 'border-blue-300 border-dashed bg-blue-50'
+          : 'border-transparent'
+        }`}>
+        <div className="space-y-4">
+          {children}
+          {isOver && !isEmpty && (
+            <div className="h-1 bg-blue-400 rounded-full animate-pulse mt-4" />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -169,6 +239,11 @@ function SortableCard({ task }: { task: Task }) {
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -177,6 +252,58 @@ export default function DashboardPage() {
       },
     })
   );
+
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-8 py-6">
+          <div className="text-sm text-gray-500 mb-2">Project / Mobile App / Board</div>
+          <h1 className="text-4xl font-bold mb-6">Mobile App</h1>
+
+          {/* Navigation Tabs */}
+          <div className="flex items-center justify-between">
+            <nav className="flex gap-8 border-b border-gray-200">
+              <button className="pb-3 text-gray-500 hover:text-gray-900">Overview</button>
+              <button className="pb-3 text-gray-900 border-b-2 border-gray-900 font-medium">Boards</button>
+              <button className="pb-3 text-gray-500 hover:text-gray-900">Timeline</button>
+              <button className="pb-3 text-gray-500 hover:text-gray-900">Activities</button>
+              <button className="pb-3 text-gray-500 hover:text-gray-900">Files</button>
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <Filter className="w-4 h-4" />
+                <span>Filter</span>
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <List className="w-4 h-4" />
+                <span>Sort</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Kanban Board - Loading State */}
+        <div className="p-8">
+          <div className="flex gap-6 overflow-x-auto">
+            <div className="flex-shrink-0 w-[340px] animate-pulse">
+              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
+              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
+            </div>
+            <div className="flex-shrink-0 w-[340px] animate-pulse">
+              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
+              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
+            </div>
+            <div className="flex-shrink-0 w-[340px] animate-pulse">
+              <div className="h-8 bg-gray-200 rounded mb-4 w-32"></div>
+              <div className="min-h-[200px] bg-gray-100 rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -266,71 +393,47 @@ export default function DashboardPage() {
           <div className="flex gap-6 overflow-x-auto">
             {/* TO DO Column */}
             <SortableContext items={todoTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex-shrink-0 w-[340px]">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-lg">TO DO</h2>
-                    <span className="bg-purple-500 text-white text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      {todoTasks.length}
-                    </span>
-                  </div>
-                  <button className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-4 min-h-[200px]" id="todo">
-                  {todoTasks.map((task) => (
-                    <SortableCard key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
+              <DroppableColumn
+                id="todo"
+                title="TO DO"
+                count={todoTasks.length}
+                badgeColor="bg-purple-500"
+                isEmpty={todoTasks.length === 0}
+              >
+                {todoTasks.map((task) => (
+                  <SortableCard key={task.id} task={task} />
+                ))}
+              </DroppableColumn>
             </SortableContext>
 
             {/* IN PROGRESS Column */}
             <SortableContext items={inProgressTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex-shrink-0 w-[340px]">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-lg">IN PROGRESS</h2>
-                    <span className="bg-pink-500 text-white text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      {inProgressTasks.length}
-                    </span>
-                  </div>
-                  <button className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-4 min-h-[200px]" id="inProgress">
-                  {inProgressTasks.map((task) => (
-                    <SortableCard key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
+              <DroppableColumn
+                id="inProgress"
+                title="IN PROGRESS"
+                count={inProgressTasks.length}
+                badgeColor="bg-pink-500"
+                isEmpty={inProgressTasks.length === 0}
+              >
+                {inProgressTasks.map((task) => (
+                  <SortableCard key={task.id} task={task} />
+                ))}
+              </DroppableColumn>
             </SortableContext>
 
             {/* COMPLETED Column */}
             <SortableContext items={completedTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              <div className="flex-shrink-0 w-[340px]">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-semibold text-lg">COMPLETED</h2>
-                    <span className="bg-purple-400 text-white text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      {completedTasks.length}
-                    </span>
-                  </div>
-                  <button className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg">
-                    <Plus className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-4 min-h-[200px]" id="completed">
-                  {completedTasks.map((task) => (
-                    <SortableCard key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
+              <DroppableColumn
+                id="completed"
+                title="COMPLETED"
+                count={completedTasks.length}
+                badgeColor="bg-purple-400"
+                isEmpty={completedTasks.length === 0}
+              >
+                {completedTasks.map((task) => (
+                  <SortableCard key={task.id} task={task} />
+                ))}
+              </DroppableColumn>
             </SortableContext>
           </div>
         </div>
