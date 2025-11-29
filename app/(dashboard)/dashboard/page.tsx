@@ -118,7 +118,7 @@ function DroppableColumn({
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div ref={setNodeRef} className="flex-1 min-w-0">
+    <div ref={setNodeRef} className="flex-shrink-0 w-[340px]">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold text-lg">{title}</h2>
@@ -192,9 +192,9 @@ export default function DashboardPage() {
 
         {/* Kanban Board Skeleton */}
         <div className="p-8">
-          <div className="flex gap-6">
+          <div className="flex gap-6 overflow-x-auto">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex-1 min-w-0">
+              <div key={i} className="flex-shrink-0 w-[340px]">
                 <div className="animate-pulse">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-7 bg-gray-200 rounded w-24"></div>
@@ -525,7 +525,7 @@ export default function DashboardPage() {
 
         {/* Kanban Board */}
         <div className="px-8 pb-8">
-          <div className="flex gap-6">
+          <div className="flex gap-6 overflow-x-auto">
             {/* TO DO Column */}
             <SortableContext items={todoTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               <DroppableColumn
@@ -576,7 +576,7 @@ export default function DashboardPage() {
 
       <DragOverlay>
         {activeTask ? (
-          <div className="flex-1">
+          <div className="w-[340px]">
             <KanbanCard
               image={activeTask.image}
               badges={activeTask.badges}
