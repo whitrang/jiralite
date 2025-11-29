@@ -715,7 +715,22 @@ export default function ProjectsPage() {
 
     if (!error) {
       // Update local state
-      setSelectedIssue({ ...selectedIssue, [field]: value });
+      const updatedIssue = { ...selectedIssue, [field]: value };
+      
+      // If updating assignee_user_id, also update assignee object
+      if (field === "assignee_user_id") {
+        if (value === null) {
+          updatedIssue.assignee = null;
+        } else {
+          // Find the assignee from team members
+          const assignee = teamMembers.find(m => m.id === value);
+          if (assignee) {
+            updatedIssue.assignee = assignee;
+          }
+        }
+      }
+      
+      setSelectedIssue(updatedIssue);
 
       // Refresh tasks list to reflect changes
       if (currentProject) {
@@ -1291,18 +1306,38 @@ export default function ProjectsPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Assignee
                     </label>
-                    <select
-                      value={selectedIssue.assignee_user_id || ""}
-                      onChange={(e) => handleUpdateIssueField("assignee_user_id", e.target.value || null)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Unassigned</option>
-                      {teamMembers.map((member: any) => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                    </select>
+                    {selectedIssue.assignee ? (
+                      <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={selectedIssue.assignee.profile_image || `https://i.pravatar.cc/150?u=${selectedIssue.assignee.id}`}
+                            alt={selectedIssue.assignee.name}
+                            className="w-8 h-8 rounded-full"
+                          />
+                          <span className="text-sm font-medium">{selectedIssue.assignee.name}</span>
+                        </div>
+                        <button
+                          onClick={() => handleUpdateIssueField("assignee_user_id", null)}
+                          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                          title="Remove assignee"
+                        >
+                          <X className="w-4 h-4 text-gray-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value=""
+                        onChange={(e) => handleUpdateIssueField("assignee_user_id", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select assignee...</option>
+                        {teamMembers.map((member: any) => (
+                          <option key={member.id} value={member.id}>
+                            {member.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
 

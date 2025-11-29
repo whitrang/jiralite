@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Card } from "./card"
-import { Paperclip, MessageCircle, Calendar } from "lucide-react"
+import { Paperclip, MessageCircle, Calendar, User } from "lucide-react"
 
 export interface Badge {
   label: string
@@ -115,9 +115,9 @@ function KanbanCard({
         <hr className="my-2 border-gray-200" />
 
         <div className="flex items-center justify-between pt-2">
-          {assignees.length > 0 && (
-            <div className="flex -space-x-2">
-              {assignees.map((assignee, index) => (
+          <div className="flex -space-x-2">
+            {assignees.length > 0 ? (
+              assignees.map((assignee, index) => (
                 assignee.avatar ? (
                   <img
                     key={index}
@@ -135,9 +135,16 @@ function KanbanCard({
                     <span>{assignee.initials || assignee.name.substring(0, 2).toUpperCase()}</span>
                   </div>
                 )
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <div
+                className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-gray-500"
+                title="No assignee"
+              >
+                <User className="w-4 h-4" />
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-3 text-gray-400 text-sm ml-auto">
             {dueDate && (
