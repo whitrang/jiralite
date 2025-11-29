@@ -14,6 +14,7 @@ export default function SignupPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +49,16 @@ export default function SignupPage() {
         },
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        // Check for invalid email address error
+        if (signUpError.message?.includes('email_address_invalid') ||
+            (signUpError as any).code === 'email_address_invalid') {
+          setShowEmailDialog(true);
+          setLoading(false);
+          return;
+        }
+        throw signUpError;
+      }
 
       if (!data.user) {
         throw new Error("User creation failed");
@@ -66,8 +76,16 @@ export default function SignupPage() {
 
       if (insertError) throw insertError;
 
-      // Success - redirect to login or dashboard
-      router.push("/login");
+      // 3. Auto-login the user
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) throw signInError;
+
+      // Success - redirect to dashboard
+      router.push("/dashboard");
     } catch (err: any) {
       setError(err.message || "An error occurred during sign up");
     } finally {
@@ -83,14 +101,50 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-      <h1 className="text-2xl font-bold mb-6">Sign Up</h1>
-
-      {error && (
-        <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-          {error}
+    <>
+      {/* Email Dialog */}
+      {showEmailDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Invalid Email Address</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Please use a real, valid email address. Supabase verifies all email addresses during signup.
+                  Fake or invalid email addresses cannot be used.
+                </p>
+                <button
+                  onClick={() => setShowEmailDialog(false)}
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
+
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6">Sign Up</h1>
+
+        <div className="bg-blue-50 text-blue-700 p-3 rounded-lg mb-4 text-sm">
+          <p className="font-medium mb-1">📧 Please use a real email address</p>
+          <p className="text-xs">
+            Supabase verifies email addresses. Using a fake email will result in an "invalid email address" error.
+          </p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+            {error}
+          </div>
+        )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -151,12 +205,13 @@ export default function SignupPage() {
         </button>
       </form>
 
-      <p className="mt-4 text-center text-sm text-gray-600">
-        Already have an account?{" "}
-        <Link href="/login" className="text-purple-600 hover:text-purple-700 font-medium">
-          Log in
-        </Link>
-      </p>
-    </div>
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link href="/login" className="text-purple-600 hover:text-purple-700 font-medium">
+            Log in
+          </Link>
+        </p>
+      </div>
+    </>
   );
 }
