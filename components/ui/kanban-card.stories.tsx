@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { KanbanCard } from './KanbanCard';
+import { KanbanCard } from './kanban-card';
 
 // 랜덤 프로필 이미지 데이터
 const randomProfiles = [
