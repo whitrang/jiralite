@@ -18,6 +18,11 @@ export default function DashboardLayout({
       href: "/dashboard",
     },
     {
+      name: "Projects",
+      icon: LayoutGrid,
+      href: "/projects",
+    },
+    {
       name: "Teams",
       icon: Users,
       href: "/teams",

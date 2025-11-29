@@ -1,7 +1,7 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Card } from "./card"
-import { Paperclip, MessageCircle } from "lucide-react"
+import { Paperclip, MessageCircle, Calendar } from "lucide-react"
 
 export interface Badge {
   label: string
@@ -22,6 +22,7 @@ export interface KanbanCardProps {
   assignees?: Assignee[]
   attachments?: number
   comments?: number
+  dueDate?: Date
   className?: string
 }
 
@@ -42,8 +43,36 @@ function KanbanCard({
   assignees = [],
   attachments,
   comments,
+  dueDate,
   className,
 }: KanbanCardProps) {
+  // Check if due date is today
+  const isToday = React.useMemo(() => {
+    if (!dueDate) return false;
+    const today = new Date();
+    return (
+      dueDate.getDate() === today.getDate() &&
+      dueDate.getMonth() === today.getMonth() &&
+      dueDate.getFullYear() === today.getFullYear()
+    );
+  }, [dueDate]);
+
+  // Check if due date is overdue
+  const isOverdue = React.useMemo(() => {
+    if (!dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    return due < today;
+  }, [dueDate]);
+
+  // Format due date
+  const formatDueDate = (date: Date) => {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${month}/${day}`;
+  };
   return (
     <Card className={cn("w-full max-w-[320px] p-0 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow", className)}>
       {image && (
@@ -111,6 +140,19 @@ function KanbanCard({
           )}
 
           <div className="flex items-center gap-3 text-gray-400 text-sm ml-auto">
+            {dueDate && (
+              <div
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded",
+                  isToday || isOverdue
+                    ? "bg-red-100 text-red-700 font-semibold"
+                    : "text-gray-600"
+                )}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>{formatDueDate(dueDate)}</span>
+              </div>
+            )}
             {attachments !== undefined && attachments > 0 && (
               <div className="flex items-center gap-1">
                 <Paperclip className="w-4 h-4" />
