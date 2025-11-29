@@ -1,0 +1,125 @@
+{
+  "tasks": [
+    {
+      "id": "task-1",
+      "status": "todo",
+      "badges": [{ "label": "Design System", "variant": "warning" }],
+      "title": "Carnesia Mobile App",
+      "description": "One-stop authentic shop for Beauty, Makeup, Skin Care & Accessories",
+      "assignees": [
+        { "name": "User 4", "avatar": "https://i.pravatar.cc/150?img=4" }
+      ],
+      "attachments": 2,
+      "comments": 19,
+      "priority": "high",
+      "createdAtDaysAgo": 2,
+      "dueDateDaysFromNow": 5
+    },
+    {
+      "id": "task-2",
+      "status": "todo",
+      "image": "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop",
+      "badges": [
+        { "label": "High", "variant": "default" },
+        { "label": "Mobile", "variant": "secondary" }
+      ],
+      "title": "Hosting Mobile Apps",
+      "description": "Task management has never looked more streamlined—and beautiful.",
+      "assignees": [
+        { "name": "User 1", "avatar": "https://i.pravatar.cc/150?img=1" },
+        { "name": "User 2", "avatar": "https://i.pravatar.cc/150?img=2" },
+        { "name": "User 3", "avatar": "https://i.pravatar.cc/150?img=3" }
+      ],
+      "attachments": 1,
+      "comments": 10,
+      "priority": "high",
+      "createdAtDaysAgo": 1,
+      "dueDateDaysFromNow": 3
+    },
+    {
+      "id": "task-3",
+      "status": "inProgress",
+      "badges": [{ "label": "Design System", "variant": "warning" }],
+      "title": "Implement Userflow and Navigation",
+      "assignees": [
+        { "name": "User 5", "avatar": "https://i.pravatar.cc/150?img=5" },
+        { "name": "User 6", "avatar": "https://i.pravatar.cc/150?img=6" },
+        { "name": "User 7", "avatar": "https://i.pravatar.cc/150?img=7" }
+      ],
+      "attachments": 7,
+      "comments": 12,
+      "priority": "medium",
+      "createdAtDaysAgo": 5,
+      "dueDateDaysFromNow": 10
+    },
+    {
+      "id": "task-4",
+      "status": "inProgress",
+      "badges": [{ "label": "Copywriting", "variant": "default" }],
+      "title": "Copy Onboarding Screens",
+      "description": "It uses a limited palette with color accents, atmospheric hero image",
+      "assignees": [
+        { "name": "User 8", "avatar": "https://i.pravatar.cc/150?img=8" },
+        { "name": "User 9", "avatar": "https://i.pravatar.cc/150?img=9" }
+      ],
+      "attachments": 2,
+      "comments": 15,
+      "priority": "low",
+      "createdAtDaysAgo": 3,
+      "dueDateDaysFromNow": 15
+    },
+    {
+      "id": "task-5",
+      "status": "inProgress",
+      "badges": [{ "label": "Moodboard", "variant": "secondary" }],
+      "title": "Admin Dashboard",
+      "description": "This convenient shortcut for manage tasks some server information",
+      "assignees": [
+        { "name": "User 10", "avatar": "https://i.pravatar.cc/150?img=10" },
+        { "name": "User 11", "avatar": "https://i.pravatar.cc/150?img=11" },
+        { "name": "User 12", "avatar": "https://i.pravatar.cc/150?img=12" }
+      ],
+      "attachments": 5,
+      "comments": 32,
+      "priority": "medium",
+      "createdAtDaysAgo": 7,
+      "dueDateDaysFromNow": 2
+    },
+    {
+      "id": "task-6",
+      "status": "completed",
+      "badges": [{ "label": "Wireframe", "variant": "default" }],
+      "title": "Test Checkout Process",
+      "description": "Test the new checkout automation wireframes with the recruiters",
+      "assignees": [
+        { "name": "User 13", "avatar": "https://i.pravatar.cc/150?img=13" },
+        { "name": "User 14", "avatar": "https://i.pravatar.cc/150?img=14" }
+      ],
+      "attachments": 1,
+      "comments": 10,
+      "priority": "high",
+      "createdAtDaysAgo": 10,
+      "dueDateDaysFromNow": -2
+    },
+    {
+      "id": "task-7",
+      "status": "completed",
+      "image": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop",
+      "badges": [
+        { "label": "Low", "variant": "danger" },
+        { "label": "UI Design", "variant": "secondary" }
+      ],
+      "title": "Website Design",
+      "description": "typography with prominent catchy tagline instantly informing",
+      "assignees": [
+        { "name": "User 15", "avatar": "https://i.pravatar.cc/150?img=15" },
+        { "name": "User 16", "avatar": "https://i.pravatar.cc/150?img=16" }
+      ],
+      "attachments": 4,
+      "comments": 26,
+      "priority": "low",
+      "createdAtDaysAgo": 15,
+      "dueDateDaysFromNow": -5
+    }
+  ]
+}

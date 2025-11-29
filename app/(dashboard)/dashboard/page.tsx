@@ -1,7 +1,7 @@
 "use client";
 
 import { KanbanCard } from "@/components/ui/kanban-card";
-import { Filter, List, Plus } from "lucide-react";
+import { Filter, List, Plus, AlertCircle, Clock, TrendingUp } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   DndContext,
@@ -16,6 +16,8 @@ import {
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import tasksData from "@/data/tasks.json";
 
 type TaskStatus = "todo" | "inProgress" | "completed";
 
@@ -31,111 +33,19 @@ interface Task {
   assignees: Array<{ name: string; avatar: string }>;
   attachments: number;
   comments: number;
+  priority?: "low" | "medium" | "high";
+  createdAt: Date;
+  dueDate?: Date;
 }
 
-const INITIAL_TASKS: Task[] = [
-  {
-    id: "task-1",
-    status: "todo",
-    badges: [{ label: "Design System", variant: "warning" }],
-    title: "Carnesia Mobile App",
-    description: "One-stop authentic shop for Beauty, Makeup, Skin Care & Accessories",
-    assignees: [
-      { name: "User 4", avatar: "https://i.pravatar.cc/150?img=4" }
-    ],
-    attachments: 2,
-    comments: 19
-  },
-
-  {
-    id: "task-2",
-    status: "todo",
-    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop",
-    badges: [
-      { label: "High", variant: "default" },
-      { label: "Mobile", variant: "secondary" }
-    ],
-    title: "Hosting Mobile Apps",
-    description: "Task management has never looked more streamlined—and beautiful.",
-    assignees: [
-      { name: "User 1", avatar: "https://i.pravatar.cc/150?img=1" },
-      { name: "User 2", avatar: "https://i.pravatar.cc/150?img=2" },
-      { name: "User 3", avatar: "https://i.prava2tar.cc/150?img=3" }
-    ],
-    attachments: 1,
-    comments: 10
-  },
-  {
-    id: "task-3",
-    status: "inProgress",
-    badges: [{ label: "Design System", variant: "warning" }],
-    title: "Implement Userflow and Navigation",
-    assignees: [
-      { name: "User 5", avatar: "https://i.pravatar.cc/150?img=5" },
-      { name: "User 6", avatar: "https://i.pravatar.cc/150?img=6" },
-      { name: "User 7", avatar: "https://i.pravatar.cc/150?img=7" }
-    ],
-    attachments: 7,
-    comments: 12
-  },
-  {
-    id: "task-4",
-    status: "inProgress",
-    badges: [{ label: "Copywriting", variant: "default" }],
-    title: "Copy Onboarding Screens",
-    description: "It uses a limited palette with color accents, atmospheric hero image",
-    assignees: [
-      { name: "User 8", avatar: "https://i.pravatar.cc/150?img=8" },
-      { name: "User 9", avatar: "https://i.pravatar.cc/150?img=9" }
-    ],
-    attachments: 2,
-    comments: 15
-  },
-  {
-    id: "task-5",
-    status: "inProgress",
-    badges: [{ label: "Moodboard", variant: "secondary" }],
-    title: "Admin Dashboard",
-    description: "This convenient shortcut for manage tasks some server information",
-    assignees: [
-      { name: "User 10", avatar: "https://i.pravatar.cc/150?img=10" },
-      { name: "User 11", avatar: "https://i.pravatar.cc/150?img=11" },
-      { name: "User 12", avatar: "https://i.pravatar.cc/150?img=12" }
-    ],
-    attachments: 5,
-    comments: 32
-  },
-  {
-    id: "task-6",
-    status: "completed",
-    badges: [{ label: "Wireframe", variant: "default" }],
-    title: "Test Checkout Process",
-    description: "Test the new checkout automation wireframes with the recruiters",
-    assignees: [
-      { name: "User 13", avatar: "https://i.pravatar.cc/150?img=13" },
-      { name: "User 14", avatar: "https://i.pravatar.cc/150?img=14" }
-    ],
-    attachments: 1,
-    comments: 10
-  },
-  {
-    id: "task-7",
-    status: "completed",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop",
-    badges: [
-      { label: "Low", variant: "danger" },
-      { label: "UI Design", variant: "secondary" }
-    ],
-    title: "Website Design",
-    description: "typography with prominent catchy tagline instantly informing",
-    assignees: [
-      { name: "User 15", avatar: "https://i.pravatar.cc/150?img=15" },
-      { name: "User 16", avatar: "https://i.pravatar.cc/150?img=16" }
-    ],
-    attachments: 4,
-    comments: 26
-  }
-];
+// Load tasks from JSON and convert date fields
+const INITIAL_TASKS: Task[] = tasksData.tasks.map((task: any) => ({
+  ...task,
+  createdAt: new Date(Date.now() - task.createdAtDaysAgo * 24 * 60 * 60 * 1000),
+  dueDate: task.dueDateDaysFromNow !== undefined
+    ? new Date(Date.now() + task.dueDateDaysFromNow * 24 * 60 * 60 * 1000)
+    : undefined,
+}));
 
 function SortableCard({ task, isOverlay = false }: { task: Task; isOverlay?: boolean }) {
   const {
@@ -208,7 +118,7 @@ function DroppableColumn({
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
-    <div ref={setNodeRef} className="flex-shrink-0 w-[340px]">
+    <div ref={setNodeRef} className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <h2 className="font-semibold text-lg">{title}</h2>
@@ -282,9 +192,9 @@ export default function DashboardPage() {
 
         {/* Kanban Board Skeleton */}
         <div className="p-8">
-          <div className="flex gap-6 overflow-x-auto">
+          <div className="flex gap-6">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex-shrink-0 w-[340px]">
+              <div key={i} className="flex-1 min-w-0">
                 <div className="animate-pulse">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="h-7 bg-gray-200 rounded w-24"></div>
@@ -366,6 +276,43 @@ export default function DashboardPage() {
 
   const activeTask = tasks.find((t) => t.id === activeId);
 
+  // Statistics calculations
+  const totalTasks = tasks.length;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+
+  // Status data for pie chart
+  const statusData = [
+    { name: "To Do", value: todoTasks.length, color: "#a855f7" },
+    { name: "In Progress", value: inProgressTasks.length, color: "#ec4899" },
+    { name: "Completed", value: completedTasks.length, color: "#c084fc" },
+  ];
+
+  // Priority data for bar chart
+  const priorityCounts = {
+    high: tasks.filter((t) => t.priority === "high").length,
+    medium: tasks.filter((t) => t.priority === "medium").length,
+    low: tasks.filter((t) => t.priority === "low").length,
+  };
+
+  const priorityData = [
+    { name: "High", count: priorityCounts.high, fill: "#ef4444" },
+    { name: "Medium", count: priorityCounts.medium, fill: "#f59e0b" },
+    { name: "Low", count: priorityCounts.low, fill: "#10b981" },
+  ];
+
+  // Recent tasks (최근 5개)
+  const recentTasks = [...tasks]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 5);
+
+  // Upcoming deadlines (7일 이내, 최대 5개)
+  const now = Date.now();
+  const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
+  const upcomingDeadlines = tasks
+    .filter((t) => t.dueDate && t.dueDate.getTime() > now && t.dueDate.getTime() <= sevenDaysLater && t.status !== "completed")
+    .sort((a, b) => (a.dueDate?.getTime() || 0) - (b.dueDate?.getTime() || 0))
+    .slice(0, 5);
+
   return (
     <DndContext
       sensors={sensors}
@@ -401,9 +348,184 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Statistics Dashboard */}
+        <div className="p-8 space-y-6">
+          {/* Stats Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Tasks */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Total Tasks</p>
+                  <p className="text-3xl font-bold">{totalTasks}</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* Completion Rate */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Completion Rate</p>
+                  <p className="text-3xl font-bold">{completionRate}%</p>
+                  <p className="text-xs text-gray-400 mt-1">{completedTasks.length} / {totalTasks}</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* In Progress */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">In Progress</p>
+                  <p className="text-3xl font-bold">{inProgressTasks.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-pink-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* Upcoming Deadlines */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">Due in 7 Days</p>
+                  <p className="text-3xl font-bold">{upcomingDeadlines.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts and Lists */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Status Distribution - Pie Chart */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Status Distribution</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {statusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-4 space-y-2">
+                {statusData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-gray-600">{item.name}</span>
+                    </div>
+                    <span className="font-medium">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority Distribution - Bar Chart */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Priority Distribution</h3>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={priorityData}>
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-4 space-y-2">
+                {priorityData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }}></div>
+                      <span className="text-gray-600">{item.name}</span>
+                    </div>
+                    <span className="font-medium">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recent Issues */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Recent Issues</h3>
+              <div className="space-y-3">
+                {recentTasks.map((task) => (
+                  <div key={task.id} className="pb-3 border-b border-gray-100 last:border-b-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        task.priority === "high" ? "bg-red-100 text-red-700" :
+                        task.priority === "medium" ? "bg-orange-100 text-orange-700" :
+                        "bg-green-100 text-green-700"
+                      }`}>
+                        {task.priority}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(task.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Upcoming Deadlines */}
+          {upcomingDeadlines.length > 0 && (
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Upcoming Deadlines (Next 7 Days)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {upcomingDeadlines.map((task) => {
+                  const daysLeft = task.dueDate
+                    ? Math.ceil((task.dueDate.getTime() - now) / (24 * 60 * 60 * 1000))
+                    : 0;
+                  return (
+                    <div key={task.id} className="p-4 border border-gray-200 rounded-lg hover:border-orange-300 transition-colors">
+                      <p className="font-medium text-gray-900 truncate mb-2">{task.title}</p>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          daysLeft <= 2 ? "bg-red-100 text-red-700" :
+                          daysLeft <= 5 ? "bg-orange-100 text-orange-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {daysLeft} day{daysLeft !== 1 ? 's' : ''} left
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {task.dueDate?.toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Kanban Board */}
-        <div className="p-8">
-          <div className="flex gap-6 overflow-x-auto">
+        <div className="px-8 pb-8">
+          <div className="flex gap-6">
             {/* TO DO Column */}
             <SortableContext items={todoTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               <DroppableColumn
@@ -454,7 +576,7 @@ export default function DashboardPage() {
 
       <DragOverlay>
         {activeTask ? (
-          <div className="w-[340px]">
+          <div className="flex-1">
             <KanbanCard
               image={activeTask.image}
               badges={activeTask.badges}
