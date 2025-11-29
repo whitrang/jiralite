@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './dialog';
-import { Button } from './Button';
+import { Button } from './button';
 import { Input } from './input';
 
 const meta = {

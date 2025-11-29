@@ -173,7 +173,7 @@ export const NoAssignees: Story = {
   },
 };
 
-export const KanbanBoard: Story = {
+export const KanbanBoard: StoryObj = {
   render: () => (
     <div className="flex gap-6 p-8 bg-gray-50">
       <div className="flex flex-col gap-4 min-w-[320px]">
